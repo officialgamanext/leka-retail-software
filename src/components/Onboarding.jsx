@@ -1,0 +1,771 @@
+import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import { 
+  Plus, 
+  Power, 
+  Landmark, 
+  LogOut, 
+  AlertTriangle, 
+  HelpCircle, 
+  Loader2, 
+  CheckCircle2, 
+  Clock, 
+  XCircle,
+  Search,
+  Filter,
+  ExternalLink,
+  MoreVertical,
+  Trash2,
+  ShieldCheck,
+  BarChart3,
+  Store,
+  Layers
+} from 'lucide-react';
+
+const API_URL = 'http://localhost:5000/api';
+
+function Onboarding({ token, user, onSelectBusiness, onLogout }) {
+  const [businesses, setBusinesses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
+  // Filters & Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+  
+  // Row Dropdown menu state
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const menuRef = useRef(null);
+
+  // Modal states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newBusinessName, setNewBusinessName] = useState('');
+  const [newBusinessAddress, setNewBusinessAddress] = useState('');
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  // Subscription block state
+  const [blockedBusiness, setBlockedBusiness] = useState(null);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
+
+  // Fetch businesses
+  useEffect(() => {
+    fetchBusinesses();
+  }, []);
+
+  // Close dropdown menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenuId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const fetchBusinesses = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await axios.get(`${API_URL}/businesses`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setBusinesses(response.data.businesses);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to retrieve business directory');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddBusiness = async (e) => {
+    e.preventDefault();
+    if (!newBusinessName || !newBusinessAddress) {
+      setModalError('Please fill in all fields.');
+      return;
+    }
+
+    setModalLoading(true);
+    setModalError('');
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/businesses`,
+        { name: newBusinessName, address: newBusinessAddress },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setBusinesses([response.data.business, ...businesses]);
+        setNewBusinessName('');
+        setNewBusinessAddress('');
+        setShowAddModal(false);
+      }
+    } catch (err) {
+      setModalError(err.response?.data?.message || 'Failed to register business');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleDemoToggleActive = async (businessId) => {
+    setOpenMenuId(null);
+    try {
+      const response = await axios.post(
+        `${API_URL}/businesses/${businessId}/demo-activate`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        fetchBusinesses();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to toggle status');
+    }
+  };
+
+  const handleDeleteBusiness = async (businessId) => {
+    setOpenMenuId(null);
+    if (!window.confirm('Are you sure you want to delete this business profile? All data will be deleted.')) {
+      return;
+    }
+
+    try {
+      const response = await axios.delete(`${API_URL}/businesses/${businessId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setBusinesses(businesses.filter(b => b.id !== businessId));
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete business');
+    }
+  };
+
+  const checkSubscriptionStatus = (biz) => {
+    const isActive = biz.isActive === true;
+    let isExpired = true;
+    let isExpiringSoon = false;
+    let expiryDate = null;
+
+    if (biz.subscriptionEndDate) {
+      expiryDate = new Date(biz.subscriptionEndDate._seconds 
+        ? biz.subscriptionEndDate._seconds * 1000 
+        : biz.subscriptionEndDate
+      );
+      
+      const now = new Date();
+      isExpired = expiryDate < now;
+
+      // Expiring in 7 days
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(now.getDate() + 7);
+      isExpiringSoon = !isExpired && expiryDate <= sevenDaysFromNow;
+    }
+
+    if (!isActive || isExpired) {
+      return { label: 'Inactive', class: 'badge-inactive', status: 'Inactive' };
+    } else if (isExpiringSoon) {
+      return { label: 'Expiring Soon', class: 'badge-expiring', status: 'Expiring Soon', expiryDate };
+    } else {
+      return { label: 'Active', class: 'badge-active', status: 'Active', expiryDate };
+    }
+  };
+
+  const handleSelectBusiness = (business) => {
+    const { status } = checkSubscriptionStatus(business);
+    if (status === 'Inactive') {
+      setBlockedBusiness(business);
+    } else {
+      onSelectBusiness(business);
+    }
+  };
+
+  // Avatar Initials + Color mapping
+  const getAvatarStyle = (name) => {
+    const code = (name || '').charCodeAt(0) % 6;
+    const colors = [
+      { bg: '#eff6ff', color: '#2563eb' }, // Blue
+      { bg: '#ecfdf5', color: '#10b981' }, // Green
+      { bg: '#fffbeb', color: '#d97706' }, // Amber
+      { bg: '#fef2f2', color: '#ef4444' }, // Red
+      { bg: '#faf5ff', color: '#8b5cf6' }, // Purple
+      { bg: '#f0fdfa', color: '#0d9488' }  // Teal
+    ];
+    const initials = (name || '').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    return { style: colors[code], initials };
+  };
+
+  // Compile Dynamic Metrics
+  const calculatedMetrics = () => {
+    let total = businesses.length;
+    let active = 0;
+    let expiring = 0;
+    let inactive = 0;
+
+    businesses.forEach(b => {
+      const { status } = checkSubscriptionStatus(b);
+      if (status === 'Active') active++;
+      else if (status === 'Expiring Soon') expiring++;
+      else inactive++;
+    });
+
+    return { total, active, expiring, inactive };
+  };
+
+  const metrics = calculatedMetrics();
+
+  // Filter & Search Logic
+  const getFilteredBusinesses = () => {
+    return businesses.filter(b => {
+      const matchesSearch = 
+        b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        b.address.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const { status } = checkSubscriptionStatus(b);
+      
+      if (statusFilter === 'All') return matchesSearch;
+      if (statusFilter === 'Active') return matchesSearch && status === 'Active';
+      if (statusFilter === 'Expiring Soon') return matchesSearch && status === 'Expiring Soon';
+      if (statusFilter === 'Inactive') return matchesSearch && status === 'Inactive';
+      
+      return matchesSearch;
+    });
+  };
+
+  const filteredList = getFilteredBusinesses();
+
+  // Pagination Logic
+  const totalItems = filteredList.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredList.slice(indexOfFirstItem, indexOfLastItem);
+
+  return (
+    <div className="onboard-split-layout">
+      {/* Left Column Accent Panel */}
+      <div className="onboard-left-sidebar">
+        <div className="auth-brand" style={{ alignItems: 'flex-start', textAlign: 'left' }}>
+          <div className="brand-icon-box">
+            <Store size={24} strokeWidth={2.5} />
+          </div>
+          <h1 className="brand-title" style={{ fontSize: '1.6rem' }}>LEKA RETAIL</h1>
+          <p className="brand-subtitle" style={{ fontSize: '0.85rem' }}>Welcome to billing suite</p>
+          <div className="brand-divider" style={{ margin: '12px 0' }}></div>
+          <p className="brand-desc" style={{ fontSize: '0.8rem', color: '#6b7280', maxWidth: '100%', marginBottom: '16px' }}>
+            Manage all your businesses in one place and streamline your operations.
+          </p>
+        </div>
+
+        <div className="features-list" style={{ gap: '16px', margin: '24px 0' }}>
+          <div className="feature-item">
+            <div className="feature-icon-box" style={{ background: '#dbeafe', color: '#2563eb' }}>
+              <Layers size={18} />
+            </div>
+            <div className="feature-text-box">
+              <h4 className="feature-title" style={{ fontSize: '0.85rem' }}>Multi Business</h4>
+              <p className="feature-desc" style={{ fontSize: '0.75rem' }}>Add and manage multiple businesses seamlessly.</p>
+            </div>
+          </div>
+
+          <div className="feature-item">
+            <div className="feature-icon-box" style={{ background: '#ecfdf5', color: '#10b981' }}>
+              <ShieldCheck size={18} />
+            </div>
+            <div className="feature-text-box">
+              <h4 className="feature-title" style={{ fontSize: '0.85rem' }}>Secure & Reliable</h4>
+              <p className="feature-desc" style={{ fontSize: '0.75rem' }}>Your data is 100% secure and always backed up.</p>
+            </div>
+          </div>
+
+          <div className="feature-item">
+            <div className="feature-icon-box" style={{ background: '#faf5ff', color: '#8b5cf6' }}>
+              <BarChart3 size={18} />
+            </div>
+            <div className="feature-text-box">
+              <h4 className="feature-title" style={{ fontSize: '0.85rem' }}>Smart Insights</h4>
+              <p className="feature-desc" style={{ fontSize: '0.75rem' }}>Get real-time insights and grow your business faster.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Vector storefront illustration */}
+        <div className="auth-illustration-container" style={{ opacity: 0.95 }}>
+          <svg width="220" height="150" viewBox="0 0 220 150" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ maxWidth: '100%' }}>
+            <line x1="10" y1="130" x2="210" y2="130" stroke="#cbd5e1" strokeWidth="2" />
+            
+            {/* Store base */}
+            <rect x="25" y="60" width="110" height="70" fill="#f8fafc" stroke="#475569" strokeWidth="2.5" />
+            {/* Door */}
+            <rect x="40" y="90" width="24" height="40" fill="#1e293b" />
+            <circle cx="60" cy="110" r="1.5" fill="#facc15" />
+            {/* Window */}
+            <rect x="80" y="85" width="45" height="30" rx="3" fill="#e0f2fe" stroke="#475569" strokeWidth="1.5" />
+            <line x1="80" y1="100" x2="125" y2="100" stroke="#475569" strokeWidth="1" />
+            <line x1="102" y1="85" x2="102" y2="115" stroke="#475569" strokeWidth="1" />
+            
+            {/* Blue Awning */}
+            <path d="M20 60 L140 60 L130 40 L30 40 Z" fill="#2563eb" />
+            <path d="M20 60 C20 63 23 65 26 65 C29 65 32 63 32 60 C32 63 35 65 38 65 C41 65 44 63 44 60 C44 63 47 65 50 65 C53 65 56 63 56 60 C56 63 59 65 62 65 C65 65 68 63 68 60 C68 63 71 65 74 65 C77 65 80 63 80 60 C80 63 83 65 86 65 C89 65 92 63 92 60 C92 63 95 65 98 65 C101 65 104 63 104 60 C104 63 107 65 110 65 C113 65 116 63 116 60 C116 63 119 65 122 65 C125 65 128 63 128 60 C128 63 131 65 134 65 C137 65 140 63 140 60" fill="#60a5fa" stroke="#2563eb" strokeWidth="1" />
+
+            {/* Desktop Screen */}
+            <g transform="translate(142, 80)">
+              <rect x="5" y="5" width="56" height="38" rx="4" fill="#0f172a" />
+              <rect x="8" y="8" width="50" height="28" fill="#ffffff" />
+              {/* Stand */}
+              <path d="M28 43 L23 55 L39 55 L34 43 Z" fill="#475569" />
+              <ellipse cx="31" cy="54" rx="14" ry="2" fill="#1e293b" />
+              {/* Charts on Screen */}
+              <rect x="12" y="12" width="16" height="4" fill="#3b82f6" />
+              <rect x="36" y="12" width="16" height="4" fill="#e2e8f0" />
+              {/* Bars */}
+              <rect x="12" y="24" width="4" height="8" fill="#10b981" />
+              <rect x="18" y="20" width="4" height="12" fill="#3b82f6" />
+              <rect x="24" y="26" width="4" height="6" fill="#f59e0b" />
+              {/* Circle chart */}
+              <circle cx="44" cy="24" r="6" stroke="#2563eb" strokeWidth="3" fill="none" />
+              <circle cx="44" cy="24" r="6" stroke="#e2e8f0" strokeWidth="3" strokeDasharray="10 30" fill="none" />
+            </g>
+
+            {/* Tiny plant */}
+            <g transform="translate(12, 114)">
+              <path d="M2 5 L4 16 L12 16 L14 5 Z" fill="#d97706" />
+              <path d="M8 5 C8 5 4 0 8 -2 C12 0 8 5 8 5 Z" fill="#10b981" />
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      {/* Right Column Main Panel */}
+      <div className="onboard-right-main">
+        {/* Header section */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+          <div>
+            <h2 style={{ fontSize: '1.6rem', color: '#0f172a', fontWeight: 700 }}>Your Businesses</h2>
+            <p style={{ color: '#6b7280', fontSize: '0.85rem', marginTop: '4px' }}>
+              View and manage all your businesses from here.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button className="btn btn-secondary" onClick={onLogout} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+              <LogOut size={14} /> Log Out
+            </button>
+            <button className="btn-blue-primary" onClick={() => setShowAddModal(true)} style={{ padding: '8px 16px', fontSize: '0.85rem', width: 'auto' }}>
+              <Plus size={16} /> Add Business
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="alert-banner error mb-4" style={{ margin: '0 0 20px 0' }}>
+            <AlertTriangle size={18} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Dynamic Metric Cards Row */}
+        <div className="onboard-metrics-grid">
+          <div className="onboard-metric-card">
+            <div className="metric-icon-wrapper blue">
+              <Store size={20} />
+            </div>
+            <div className="metric-info-col">
+              <span className="metric-val">{metrics.total}</span>
+              <span className="metric-lbl">Total Businesses</span>
+              <span className="metric-sublbl">All Businesses</span>
+            </div>
+          </div>
+
+          <div className="onboard-metric-card">
+            <div className="metric-icon-wrapper green">
+              <CheckCircle2 size={20} />
+            </div>
+            <div className="metric-info-col">
+              <span className="metric-val">{metrics.active}</span>
+              <span className="metric-lbl">Active</span>
+              <span className="metric-sublbl">Running Smoothly</span>
+            </div>
+          </div>
+
+          <div className="onboard-metric-card">
+            <div className="metric-icon-wrapper orange">
+              <Clock size={20} />
+            </div>
+            <div className="metric-info-col">
+              <span className="metric-val">{metrics.expiring}</span>
+              <span className="metric-lbl">Expiring Soon</span>
+              <span className="metric-sublbl">Renew Soon</span>
+            </div>
+          </div>
+
+          <div className="onboard-metric-card">
+            <div className="metric-icon-wrapper red">
+              <XCircle size={20} />
+            </div>
+            <div className="metric-info-col">
+              <span className="metric-val">{metrics.inactive}</span>
+              <span className="metric-lbl">Inactive</span>
+              <span className="metric-sublbl">Not Active</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Filter Row */}
+        <div className="search-filter-row">
+          <div className="search-input-wrapper">
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '13px', color: '#9ca3af' }} />
+            <input
+              type="text"
+              placeholder="Search business by name, owner or email..."
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+            />
+          </div>
+          <div className="filter-dropdown-wrapper">
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <Filter size={14} style={{ position: 'absolute', left: '12px', color: '#4b5563', pointerEvents: 'none' }} />
+              <select
+                className="filter-select"
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                style={{ paddingLeft: '32px' }}
+              >
+                <option value="All">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Expiring Soon">Expiring Soon</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Businesses Table list */}
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexGrow: 1, minHeight: '260px', gap: '12px' }}>
+            <Loader2 className="animate-spin" size={32} style={{ color: '#2563eb' }} />
+            <p style={{ color: '#6b7280', fontSize: '0.85rem' }}>Loading registry...</p>
+          </div>
+        ) : filteredList.length === 0 ? (
+          <div style={{ textAlign: 'center', background: '#ffffff', border: '1px dashed #e5e7eb', borderRadius: '12px', padding: '60px 40px', flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+            <Store size={40} style={{ color: '#cbd5e1', marginBottom: '12px' }} />
+            <h4 style={{ color: '#374151', fontSize: '0.95rem', fontWeight: 600 }}>No businesses match criteria</h4>
+            <p style={{ color: '#6b7280', fontSize: '0.82rem', marginTop: '6px', marginBottom: '18px' }}>
+              Create a new business terminal to get started.
+            </p>
+            <button className="btn-blue-primary" onClick={() => setShowAddModal(true)} style={{ width: 'auto', padding: '8px 16px', fontSize: '0.8rem' }}>
+              <Plus size={14} /> Add Business
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="onboard-table-container">
+              <table className="onboard-data-table">
+                <thead>
+                  <tr>
+                    <th>Business Name</th>
+                    <th>Owner / Phone</th>
+                    <th>Plan</th>
+                    <th>Status</th>
+                    <th>Expiry Date</th>
+                    <th>Created On</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentItems.map((biz) => {
+                    const { initials, style } = getAvatarStyle(biz.name);
+                    const statusCheck = checkSubscriptionStatus(biz);
+                    
+                    const createdDate = biz.createdAt?._seconds 
+                      ? new Date(biz.createdAt._seconds * 1000) 
+                      : new Date(biz.createdAt || Date.now());
+                    
+                    const formattedCreated = createdDate.toLocaleDateString(undefined, {
+                      day: '2-digit', month: 'short', year: 'numeric'
+                    });
+
+                    const formattedExpiry = statusCheck.expiryDate 
+                      ? statusCheck.expiryDate.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
+                      : '—';
+
+                    const isMenuOpen = openMenuId === biz.id;
+
+                    return (
+                      <tr key={biz.id}>
+                        <td>
+                          <div className="biz-name-cell">
+                            <div className="avatar-circle" style={{ backgroundColor: style.bg, color: style.color }}>
+                              {initials}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, color: '#1f2937' }}>{biz.name}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '2px' }}>
+                                {biz.address}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ color: '#4b5563', fontFamily: 'monospace' }}>
+                          {user?.phone || '—'}
+                        </td>
+                        <td>
+                          <span style={{ fontWeight: 500, color: '#374151' }}>
+                            {statusCheck.status === 'Inactive' ? 'Basic' : 'Premium'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`table-badge ${statusCheck.class}`}>
+                            ● {statusCheck.label}
+                          </span>
+                        </td>
+                        <td style={{ 
+                          fontWeight: statusCheck.status === 'Expiring Soon' ? 600 : 500,
+                          color: statusCheck.status === 'Expiring Soon' ? '#ef4444' : '#4b5563'
+                        }}>
+                          {formattedExpiry}
+                        </td>
+                        <td style={{ color: '#6b7280' }}>
+                          {formattedCreated}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            <button 
+                              className="open-terminal-btn"
+                              onClick={() => handleSelectBusiness(biz)}
+                            >
+                              Open <ExternalLink size={12} />
+                            </button>
+                            
+                            {/* Dots Actions Menu dropdown */}
+                            <div className="dots-menu-container" ref={isMenuOpen ? menuRef : null}>
+                              <button 
+                                className="dots-actions-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMenuId(isMenuOpen ? null : biz.id);
+                                }}
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+                              
+                              {isMenuOpen && (
+                                <div className="dots-dropdown-menu">
+                                  <button 
+                                    className="dots-menu-item"
+                                    onClick={() => handleDemoToggleActive(biz.id)}
+                                  >
+                                    <Power size={12} style={{ color: '#2563eb' }} />
+                                    {statusCheck.status === 'Inactive' ? 'Demo: Activate' : 'Demo: Deactivate'}
+                                  </button>
+                                  <button 
+                                    className="dots-menu-item danger-action"
+                                    onClick={() => handleDeleteBusiness(biz.id)}
+                                  >
+                                    <Trash2 size={12} />
+                                    Delete Business
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="onboard-pagination-row">
+              <span>
+                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, totalItems)} of {totalItems} businesses
+              </span>
+              
+              <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.78rem' }}>Rows per page:</span>
+                  <select 
+                    value={itemsPerPage} 
+                    disabled
+                    style={{ padding: '4px 8px', fontSize: '0.78rem', width: 'auto', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#4b5563' }}
+                  >
+                    <option value={7}>7 per page</option>
+                  </select>
+                </div>
+
+                <div className="pagination-btn-group">
+                  <button 
+                    className="pagination-number-btn"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    ‹
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      className={`pagination-number-btn ${currentPage === page ? 'active' : ''}`}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button 
+                    className="pagination-number-btn"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Add Business Modal Overlay */}
+      {showAddModal && (
+        <div className="modal-overlay">
+          <form className="modal-content" onSubmit={handleAddBusiness} style={{ maxWidth: '460px', color: '#1f2937', background: '#ffffff' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: '14px' }}>
+              <h2 style={{ color: '#0f172a', fontWeight: 700, fontSize: '1.25rem' }}>Register New Business</h2>
+              <button 
+                type="button" 
+                className="modal-close" 
+                onClick={() => setShowAddModal(false)}
+                style={{ color: '#9ca3af' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {modalError && (
+              <div className="alert-banner error mb-4" style={{ margin: '14px 0' }}>
+                <AlertTriangle size={16} />
+                <span>{modalError}</span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', margin: '20px 0' }}>
+              <div>
+                <label htmlFor="bizName" style={{ color: '#4b5563', fontSize: '0.8rem', fontWeight: 600 }}>
+                  Business Name *
+                </label>
+                <input
+                  id="bizName"
+                  type="text"
+                  placeholder="e.g. Shiv Shakti Store"
+                  value={newBusinessName}
+                  onChange={(e) => setNewBusinessName(e.target.value)}
+                  disabled={modalLoading}
+                  style={{ background: '#ffffff', color: '#1f2937', border: '1px solid #d1d5db', borderRadius: '8px', padding: '10px 12px', marginTop: '6px' }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="bizAddress" style={{ color: '#4b5563', fontSize: '0.8rem', fontWeight: 600 }}>
+                  Address / Location *
+                </label>
+                <textarea
+                  id="bizAddress"
+                  placeholder="e.g. Shop 42, Sector 12, Goyal Plaza, Delhi"
+                  value={newBusinessAddress}
+                  onChange={(e) => setNewBusinessAddress(e.target.value)}
+                  disabled={modalLoading}
+                  rows={3}
+                  style={{ background: '#ffffff', color: '#1f2937', border: '1px solid #d1d5db', borderRadius: '8px', padding: '10px 12px', marginTop: '6px', resize: 'none' }}
+                  required
+                />
+              </div>
+
+              <div className="alert-banner" style={{ margin: 0, padding: '10px 12px', background: '#f9fafb', border: '1px solid #e5e7eb', color: '#6b7280' }}>
+                <HelpCircle size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
+                  Upon creation, the business subscription end date is set to pending (null) and inactive. Use the dropdown action menu to demo activate it.
+                </span>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid #f3f4f6', paddingTop: '14px' }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setShowAddModal(false)}
+                disabled={modalLoading}
+                style={{ background: '#f3f4f6', border: 'none', color: '#4b5563' }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                className="btn-blue-primary" 
+                disabled={modalLoading}
+                style={{ width: 'auto' }}
+              >
+                {modalLoading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} /> Creating...
+                  </>
+                ) : (
+                  'Create Business'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Access Denied Modal */}
+      {blockedBusiness && (
+        <div className="modal-overlay">
+          <div className="modal-content sub-block-modal" style={{ background: '#ffffff', color: '#1f2937' }}>
+            <div className="sub-block-icon" style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fee2e2' }}>
+              <XCircle size={36} />
+            </div>
+            
+            <h2 style={{ color: '#ef4444', marginBottom: '12px', fontWeight: 700 }}>Access Denied</h2>
+            
+            <p style={{ color: '#0f172a', fontWeight: 700, marginBottom: '8px', fontSize: '1.05rem' }}>
+              Subscription Inactive for {blockedBusiness.name}
+            </p>
+            
+            <p style={{ color: '#6b7280', fontSize: '0.85rem', lineHeight: '1.5', marginBottom: '24px' }}>
+              Strict security policies prohibit access. Your account's active subscription period has either expired or is not yet configured. Please contact the platform administrator to activate your business subscription.
+            </p>
+
+            <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '12px', border: '1px solid #e5e7eb', marginBottom: '24px', textAlign: 'left' }}>
+              <span style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', fontWeight: 700, marginBottom: '4px' }}>
+                DEVELOPER NOTE
+              </span>
+              <p style={{ fontSize: '0.72rem', color: '#d97706', lineHeight: '1.4' }}>
+                Use the three vertical dots menu <strong>(⋮)</strong> on the business row table and select <strong>"Demo: Activate"</strong> to bypass this block.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setBlockedBusiness(null)}
+                style={{ background: '#f3f4f6', border: 'none', color: '#4b5563' }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default Onboarding;
