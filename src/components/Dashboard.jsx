@@ -23,6 +23,7 @@ import Invoices from './Invoices';
 import Settings from './Settings';
 import Customers from './Customers';
 import ComingSoonPage from './ComingSoonPage';
+import DashboardPage from './DashboardPage';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -89,12 +90,64 @@ const MODULE_CONFIG = {
 
 // ─── All valid page tab names ─────────────────────────────────────────────────
 const ALL_TABS = [
-  'home', 'pos', 'products', 'customers', 'vendors', 'staff', 'expenses', 'stock', 'settings'
+  'home', 'dashboard-view', 'pos', 'products', 'customers', 'vendors', 'staff', 'expenses', 'stock', 'settings'
 ];
+
+// ─── Path to Tab mappings ─────────────────────────────────────────────────────
+const PATH_TO_TAB = {
+  '/home': 'home',
+  '/dashboard': 'dashboard-view',
+  '/billing': 'pos',
+  '/products': 'products',
+  '/customer': 'customers',
+  '/vendors': 'vendors',
+  '/staff': 'staff',
+  '/expenses': 'expenses',
+  '/stock': 'stock',
+  '/settings': 'settings'
+};
+
+const TAB_TO_PATH = {
+  'home': '/home',
+  'dashboard-view': '/dashboard',
+  'pos': '/billing',
+  'products': '/products',
+  'customers': '/customer',
+  'vendors': '/vendors',
+  'staff': '/staff',
+  'expenses': '/expenses',
+  'stock': '/stock',
+  'settings': '/settings'
+};
 
 // ─── Dashboard Component ──────────────────────────────────────────────────────
 function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
-  const [activeTab, setActiveTab]               = useState('home');
+  const [activeTabVal, setActiveTabVal] = useState(() => {
+    return PATH_TO_TAB[window.location.pathname] || 'home';
+  });
+
+  const setActiveTab = useCallback((tabId) => {
+    const path = TAB_TO_PATH[tabId];
+    if (path && window.location.pathname !== path) {
+      window.history.pushState(null, '', path);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+    setActiveTabVal(tabId);
+  }, []);
+
+  const activeTab = activeTabVal;
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const tab = PATH_TO_TAB[window.location.pathname];
+      if (tab) {
+        setActiveTabVal(tab);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const [subscriptionKicked, setSubscriptionKicked] = useState(false);
   const [showStoreDropdown, setShowStoreDropdown]   = useState(false);
   const [showAdminDropdown, setShowAdminDropdown]   = useState(false);
@@ -221,6 +274,7 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
 
   // ── Home Grid Cards ───────────────────────────────────────────────────────
   const cards = [
+    { id: 'dashboard-view', title: 'Dashboard',   desc: 'Real-time sales, stats and warnings summary',      icon: <BarChart3 />,   colorClass: 'blue'   },
     { id: 'pos',       title: 'Billing',             desc: 'Create invoices and process sales quickly',          icon: <Calculator />,  colorClass: 'blue'   },
     { id: 'products',  title: 'Products',            desc: 'Manage product stock, categories and prices',       icon: <Package />,     colorClass: 'green'  },
     { id: 'customers', title: 'Customer',            desc: 'Add and manage customer information',               icon: <Users />,       colorClass: 'purple' },
@@ -278,7 +332,7 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
       <div style={{ padding: '24px 32px' }}>
         <div className="breadcrumb-bar">
           <button className="breadcrumb-back-btn" onClick={() => setActiveTab('home')}>
-            <ArrowLeft size={14} /> Back to Dashboard
+            <ArrowLeft size={14} /> Back to Home
           </button>
           <span>/</span>
           <span style={{ fontWeight: 600, color: '#374151' }}>{label}</span>
@@ -293,6 +347,11 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
     switch (activeTab) {
       case 'home':
         return renderHomeGrid();
+
+      case 'dashboard-view':
+        return renderPageWithBreadcrumb('Dashboard',
+          <DashboardPage token={token} business={business} />
+        );
 
       // ── Fully implemented pages ──
       case 'pos':

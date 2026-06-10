@@ -19,6 +19,24 @@ function App() {
   // Used when the interceptor detects a forced security kick-out mid-session
   const [securityMessage, setSecurityMessage] = useState('');
 
+  // Custom Routing states
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  const navigate = useCallback((path) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, '', path);
+    }
+    setCurrentPath(path);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // ─── Logout helper (used by interceptor + UI) ──────────────────────────────
   const handleLogout = useCallback((message = '') => {
     localStorage.removeItem('leka_token');
@@ -27,13 +45,15 @@ function App() {
     setUser(null);
     setSelectedBusiness(null);
     if (message) setSecurityMessage(message);
-  }, []);
+    navigate('/login');
+  }, [navigate]);
 
   const handleSwitchBusiness = useCallback((message = '') => {
     localStorage.removeItem('leka_business');
     setSelectedBusiness(null);
     if (message) setSecurityMessage(message);
-  }, []);
+    navigate('/onboarding');
+  }, [navigate]);
 
   // ─── Attach Axios Interceptors once ────────────────────────────────────────
   // These fire on every API response regardless of which component made the call.
@@ -155,13 +175,39 @@ function App() {
     localStorage.setItem('leka_token', userToken);
     setUser(userData);
     setToken(userToken);
+    navigate('/onboarding');
   };
 
   const handleSelectBusiness = (business) => {
     setSecurityMessage('');
     localStorage.setItem('leka_business', JSON.stringify(business));
     setSelectedBusiness(business);
+    navigate('/dashboard');
   };
+
+  // ─── Routing Guards and Redirects Effect ──────────────────────────────────
+  useEffect(() => {
+    if (loading) return;
+
+    if (!token || !user) {
+      if (currentPath !== '/login') {
+        navigate('/login');
+      }
+    } else if (!selectedBusiness) {
+      if (currentPath !== '/onboarding') {
+        navigate('/onboarding');
+      }
+    } else {
+      // Authenticated with business selected
+      const allowedPaths = [
+        '/dashboard', '/billing', '/products', '/customer',
+        '/vendors', '/staff', '/expenses', '/stock', '/settings', '/home'
+      ];
+      if (!allowedPaths.includes(currentPath)) {
+        navigate('/home');
+      }
+    }
+  }, [loading, token, user, selectedBusiness, currentPath, navigate]);
 
   // ─── Loading Splash ────────────────────────────────────────────────────────
   if (loading) {

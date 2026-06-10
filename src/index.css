@@ -1829,3 +1829,131 @@ label {
   text-decoration: underline;
 }
 
+/* Dashboard Page Layout */
+.db-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 28px;
+}
+@media (max-width: 1024px) {
+  .db-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .db-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.db-stat-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.01);
+}
+
+.db-stat-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.db-stat-icon-box.blue { background: #eff6ff; color: #2563eb; }
+.db-stat-icon-box.green { background: #f0fdf4; color: #16a34a; }
+.db-stat-icon-box.red { background: #fef2f2; color: #ef4444; }
+.db-stat-icon-box.purple { background: #f5f3ff; color: #7c3aed; }
+
+.db-stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.db-stat-label {
+  font-size: 0.78rem;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.db-stat-value {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-top: 4px;
+}
+
+.db-main-layout {
+  display: grid;
+  grid-template-columns: 2fr 1.1fr;
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .db-main-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.db-panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.01);
+}
+
+.db-panel-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.db-warning-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.db-warning-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.db-warning-badge {
+  background: #fef2f2;
+  color: #ef4444;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #fee2e2;
+}
+
+.db-warning-badge-orange {
+  background: #fff7ed;
+  color: #ea580c;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #ffedd5;
+}
