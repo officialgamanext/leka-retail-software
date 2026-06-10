@@ -24,6 +24,7 @@ import Settings from './Settings';
 import Customers from './Customers';
 import ComingSoonPage from './ComingSoonPage';
 import DashboardPage from './DashboardPage';
+import Expenses from './Expenses';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -56,20 +57,6 @@ const MODULE_CONFIG = {
       { icon: <Activity />, label: 'Activity Log', desc: 'Track all actions taken by each user' },
       { icon: <Settings2 />, label: 'Session Control', desc: 'Force logout and manage active sessions' },
       { icon: <Phone />, label: 'OTP Login', desc: 'All users log in securely via SMS OTP' },
-    ]
-  },
-  expenses: {
-    title: 'Expenses',
-    desc: 'Record, categorise, and analyse all your business expenses in one place.',
-    icon: <Wallet />,
-    colorClass: 'orange',
-    features: [
-      { icon: <DollarSign />, label: 'Expense Recording', desc: 'Quickly log daily expenses with category and notes' },
-      { icon: <Tag />, label: 'Categories', desc: 'Organise expenses by Rent, Utilities, Salaries, and more' },
-      { icon: <Receipt />, label: 'Receipt Upload', desc: 'Attach photo receipts to each expense entry' },
-      { icon: <TrendingDown />, label: 'Monthly Overview', desc: 'Visual breakdown of spending patterns over time' },
-      { icon: <CreditCard />, label: 'Payment Modes', desc: 'Track Cash, UPI, Card and Bank Transfer expenses' },
-      { icon: <FileText />, label: 'Export Reports', desc: 'Download expense sheets for accounting purposes' },
     ]
   },
   stock: {
@@ -373,6 +360,8 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
         );
       case 'customers':
         return renderPageWithBreadcrumb('Customer', <Customers token={token} business={business} />);
+      case 'expenses':
+        return renderPageWithBreadcrumb('Expenses', <Expenses token={token} business={business} />);
       case 'settings':
         return renderPageWithBreadcrumb('Settings',
           <Settings token={token} business={business} user={user} onSwitchBusiness={onSwitchBusiness} onLogout={onLogout} />
