@@ -22,9 +22,9 @@ import {
   Layers
 } from 'lucide-react';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
-function Onboarding({ token, user, onSelectBusiness, onLogout }) {
+function Onboarding({ token, user, onSelectBusiness, onLogout, securityMessage, onClearMessage }) {
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -346,9 +346,9 @@ function Onboarding({ token, user, onSelectBusiness, onLogout }) {
       {/* Right Column Main Panel */}
       <div className="onboard-right-main">
         {/* Header section */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
-            <h2 style={{ fontSize: '1.6rem', color: '#0f172a', fontWeight: 700 }}>Your Businesses</h2>
+            <h2 style={{ fontSize: '1.6rem', color: '#0f172a', fontWeight: 600 }}>Your Businesses</h2>
             <p style={{ color: '#6b7280', fontSize: '0.85rem', marginTop: '4px' }}>
               View and manage all your businesses from here.
             </p>
@@ -362,6 +362,29 @@ function Onboarding({ token, user, onSelectBusiness, onLogout }) {
             </button>
           </div>
         </div>
+
+        {/* Security banner shown when auto-redirected from Dashboard */}
+        {securityMessage && (
+          <div style={{
+            background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '8px',
+            padding: '12px 14px', display: 'flex', alignItems: 'flex-start',
+            gap: '10px', marginBottom: '16px'
+          }}>
+            <AlertTriangle size={16} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: '0.82rem', color: '#b91c1c', lineHeight: 1.5 }}>
+                {securityMessage}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onClearMessage}
+              style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1 }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="alert-banner error mb-4" style={{ margin: '0 0 20px 0' }}>
@@ -505,7 +528,7 @@ function Onboarding({ token, user, onSelectBusiness, onLogout }) {
                               {initials}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 700, color: '#1f2937' }}>{biz.name}</div>
+                              <div style={{ fontWeight: 600, color: '#1f2937' }}>{biz.name}</div>
                               <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '2px' }}>
                                 {biz.address}
                               </div>
@@ -637,7 +660,7 @@ function Onboarding({ token, user, onSelectBusiness, onLogout }) {
         <div className="modal-overlay">
           <form className="modal-content" onSubmit={handleAddBusiness} style={{ maxWidth: '460px', color: '#1f2937', background: '#ffffff' }}>
             <div className="modal-header" style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: '14px' }}>
-              <h2 style={{ color: '#0f172a', fontWeight: 700, fontSize: '1.25rem' }}>Register New Business</h2>
+              <h2 style={{ color: '#0f172a', fontWeight: 600, fontSize: '1.25rem' }}>Register New Business</h2>
               <button 
                 type="button" 
                 className="modal-close" 
@@ -733,9 +756,9 @@ function Onboarding({ token, user, onSelectBusiness, onLogout }) {
               <XCircle size={36} />
             </div>
             
-            <h2 style={{ color: '#ef4444', marginBottom: '12px', fontWeight: 700 }}>Access Denied</h2>
+            <h2 style={{ color: '#ef4444', marginBottom: '12px', fontWeight: 600 }}>Access Denied</h2>
             
-            <p style={{ color: '#0f172a', fontWeight: 700, marginBottom: '8px', fontSize: '1.05rem' }}>
+            <p style={{ color: '#0f172a', fontWeight: 600, marginBottom: '8px', fontSize: '1.05rem' }}>
               Subscription Inactive for {blockedBusiness.name}
             </p>
             
@@ -744,7 +767,7 @@ function Onboarding({ token, user, onSelectBusiness, onLogout }) {
             </p>
 
             <div style={{ background: '#f9fafb', borderRadius: '8px', padding: '12px', border: '1px solid #e5e7eb', marginBottom: '24px', textAlign: 'left' }}>
-              <span style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', fontWeight: 700, marginBottom: '4px' }}>
+              <span style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', fontWeight: 600, marginBottom: '4px' }}>
                 DEVELOPER NOTE
               </span>
               <p style={{ fontSize: '0.72rem', color: '#d97706', lineHeight: '1.4' }}>

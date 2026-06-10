@@ -392,7 +392,7 @@ function POS({ token, business }) {
             {/* Print Friendly Format */}
             <div className="receipt-wrapper">
               <div className="receipt-header">
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>{business.name}</h2>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, margin: 0 }}>{business.name}</h2>
                 <p style={{ fontSize: '0.75rem', color: '#475569', margin: '4px 0 0 0' }}>{business.address}</p>
               </div>
 

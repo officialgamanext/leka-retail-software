@@ -1,74 +1,145 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
 import Login from './components/Login';
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-function App() {
-  const [token, setToken] = useState(localStorage.getItem('leka_token') || null);
-  const [user, setUser] = useState(null);
-  const [selectedBusiness, setSelectedBusiness] = useState(null);
-  const [loading, setLoading] = useState(true);
+// ─── Global Axios Instance ────────────────────────────────────────────────────
+// All components must use this instead of raw axios so interceptors apply.
+export const api = axios.create({ baseURL: API_URL });
 
-  // Initialize session and fetch user profile
+function App() {
+  const [token, setToken]                   = useState(null);
+  const [user, setUser]                     = useState(null);
+  const [selectedBusiness, setSelectedBusiness] = useState(null);
+  const [loading, setLoading]               = useState(true);
+  // Used when the interceptor detects a forced security kick-out mid-session
+  const [securityMessage, setSecurityMessage] = useState('');
+
+  // ─── Logout helper (used by interceptor + UI) ──────────────────────────────
+  const handleLogout = useCallback((message = '') => {
+    localStorage.removeItem('leka_token');
+    localStorage.removeItem('leka_business');
+    setToken(null);
+    setUser(null);
+    setSelectedBusiness(null);
+    if (message) setSecurityMessage(message);
+  }, []);
+
+  const handleSwitchBusiness = useCallback((message = '') => {
+    localStorage.removeItem('leka_business');
+    setSelectedBusiness(null);
+    if (message) setSecurityMessage(message);
+  }, []);
+
+  // ─── Attach Axios Interceptors once ────────────────────────────────────────
+  // These fire on every API response regardless of which component made the call.
+  useEffect(() => {
+    // Request interceptor — inject current token automatically
+    const reqInterceptor = api.interceptors.request.use((config) => {
+      const currentToken = localStorage.getItem('leka_token');
+      if (currentToken) {
+        config.headers['Authorization'] = `Bearer ${currentToken}`;
+      }
+      return config;
+    });
+
+    // Response interceptor — handle auth/subscription failures globally
+    const resInterceptor = api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        const status = error?.response?.status;
+        if (status === 401) {
+          // Token invalid or expired → full logout
+          handleLogout('Your session has expired. Please log in again.');
+        } else if (status === 403) {
+          // Subscription expired or business access revoked → go back to onboarding
+          handleSwitchBusiness('Access denied. Your business subscription may have expired.');
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      api.interceptors.request.eject(reqInterceptor);
+      api.interceptors.response.eject(resInterceptor);
+    };
+  }, [handleLogout, handleSwitchBusiness]);
+
+  // ─── Session Initialization on mount ───────────────────────────────────────
   useEffect(() => {
     const initSession = async () => {
-      if (!token) {
+      const storedToken = localStorage.getItem('leka_token');
+      if (!storedToken) {
         setLoading(false);
         return;
       }
 
       try {
-        const response = await axios.get(`${API_URL}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }
+        // Step 1 — Verify token is still valid with the API
+        const meRes = await api.get('/auth/me', {
+          headers: { Authorization: `Bearer ${storedToken}` }
         });
-        
-        if (response.data.success) {
-          setUser(response.data.user);
-          
-          // Check if there is a previously selected business stored in localStorage
-          const savedBusinessStr = localStorage.getItem('leka_business');
-          if (savedBusinessStr) {
-            const savedBiz = JSON.parse(savedBusinessStr);
-            
-            // To ensure strict security: verify if the business is still active
-            const verifyResponse = await axios.get(`${API_URL}/businesses`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            
-            const currentBiz = verifyResponse.data.businesses.find(b => b.id === savedBiz.id);
-            
-            if (currentBiz) {
-              const isActive = currentBiz.isActive === true;
-              let isExpired = true;
-              
-              if (currentBiz.subscriptionEndDate) {
-                const expiry = new Date(currentBiz.subscriptionEndDate._seconds 
-                  ? currentBiz.subscriptionEndDate._seconds * 1000 
-                  : currentBiz.subscriptionEndDate
-                );
-                isExpired = expiry < new Date();
-              }
-              
-              if (isActive && !isExpired) {
-                setSelectedBusiness(currentBiz);
-              } else {
-                // Subscription has become inactive, clear from localStorage
-                localStorage.removeItem('leka_business');
-              }
-            }
+
+        if (!meRes.data.success) {
+          handleLogout('Session invalid. Please log in again.');
+          return;
+        }
+
+        setToken(storedToken);
+        setUser(meRes.data.user);
+
+        // Step 2 — If a business was previously selected, re-validate it against live API data
+        const savedBusinessStr = localStorage.getItem('leka_business');
+        if (savedBusinessStr) {
+          let savedBiz;
+          try { savedBiz = JSON.parse(savedBusinessStr); } catch { 
+            localStorage.removeItem('leka_business');
+            return;
           }
-        } else {
-          handleLogout();
+
+          const bizRes = await api.get('/businesses', {
+            headers: { Authorization: `Bearer ${storedToken}` }
+          });
+
+          const liveBiz = bizRes.data.businesses?.find(b => b.id === savedBiz.id);
+
+          if (!liveBiz) {
+            // Business no longer exists
+            localStorage.removeItem('leka_business');
+            return;
+          }
+
+          // Step 3 — Check both isActive AND subscriptionEndDate strictly
+          const isActive = liveBiz.isActive === true;
+          let isExpired  = true;
+
+          if (liveBiz.subscriptionEndDate) {
+            const expiry = new Date(
+              liveBiz.subscriptionEndDate._seconds
+                ? liveBiz.subscriptionEndDate._seconds * 1000
+                : liveBiz.subscriptionEndDate
+            );
+            isExpired = expiry < new Date();
+          }
+
+          if (isActive && !isExpired) {
+            setSelectedBusiness(liveBiz);
+          } else {
+            // Subscription lapsed between sessions — clear silently
+            localStorage.removeItem('leka_business');
+          }
         }
       } catch (err) {
-        console.error('Session initialization failed:', err.message);
-        // Clear token if invalid or expired
-        if (err.response?.status === 401) {
-          handleLogout();
+        console.error('Session init failed:', err.message);
+        // Interceptor handles 401/403; catch anything else here
+        if (!err?.response?.status) {
+          // Network error — don't wipe session, just show onboarding
+          const storedToken2 = localStorage.getItem('leka_token');
+          setToken(storedToken2);
         }
       } finally {
         setLoading(false);
@@ -76,64 +147,70 @@ function App() {
     };
 
     initSession();
-  }, [token]);
+  }, []); // Only on mount — interceptors handle mid-session events
 
+  // ─── Handlers passed down to children ─────────────────────────────────────
   const handleLoginSuccess = (userToken, userData) => {
+    setSecurityMessage('');
     localStorage.setItem('leka_token', userToken);
     setUser(userData);
     setToken(userToken);
   };
 
   const handleSelectBusiness = (business) => {
+    setSecurityMessage('');
     localStorage.setItem('leka_business', JSON.stringify(business));
     setSelectedBusiness(business);
   };
 
-  const handleSwitchBusiness = () => {
-    localStorage.removeItem('leka_business');
-    setSelectedBusiness(null);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('leka_token');
-    localStorage.removeItem('leka_business');
-    setUser(null);
-    setSelectedBusiness(null);
-    setToken(null);
-  };
-
+  // ─── Loading Splash ────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: '16px', backgroundColor: 'var(--bg-app)' }}>
-        <Loader2 className="animate-spin" size={48} style={{ color: 'var(--primary)' }} />
-        <p style={{ color: 'var(--text-secondary)', fontFamily: 'Outfit' }}>Securing terminal session...</p>
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', minHeight: '100vh', gap: '16px',
+        backgroundColor: '#f1f5f9'
+      }}>
+        <Loader2 className="animate-spin" size={44} style={{ color: '#2563eb' }} />
+        <p style={{ color: '#6b7280', fontFamily: 'Outfit', fontSize: '0.9rem' }}>
+          Verifying your session...
+        </p>
       </div>
     );
   }
 
-  // Routing Logic
+  // ─── Route Guard: Must be logged in ───────────────────────────────────────
   if (!token || !user) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
-  }
-
-  if (!selectedBusiness) {
     return (
-      <Onboarding 
-        token={token} 
-        user={user} 
-        onSelectBusiness={handleSelectBusiness} 
-        onLogout={handleLogout} 
+      <Login
+        onLoginSuccess={handleLoginSuccess}
+        securityMessage={securityMessage}
       />
     );
   }
 
+  // ─── Route Guard: Must have an active business selected ───────────────────
+  if (!selectedBusiness) {
+    return (
+      <Onboarding
+        token={token}
+        user={user}
+        onSelectBusiness={handleSelectBusiness}
+        onLogout={() => handleLogout()}
+        securityMessage={securityMessage}
+        onClearMessage={() => setSecurityMessage('')}
+      />
+    );
+  }
+
+  // ─── Main Dashboard — only reached if token + user + active business ───────
   return (
-    <Dashboard 
-      token={token} 
-      business={selectedBusiness} 
-      user={user} 
-      onSwitchBusiness={handleSwitchBusiness} 
-      onLogout={handleLogout} 
+    <Dashboard
+      token={token}
+      business={selectedBusiness}
+      user={user}
+      onSwitchBusiness={() => handleSwitchBusiness()}
+      onLogout={() => handleLogout()}
     />
   );
 }

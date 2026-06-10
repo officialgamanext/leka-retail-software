@@ -118,7 +118,7 @@ function Invoices({ token, business }) {
                       </span>
                     </td>
                     <td>{totalItems} items</td>
-                    <td style={{ fontWeight: 700 }}>₹{Number(inv.grandTotal).toFixed(2)}</td>
+                    <td style={{ fontWeight: 600 }}>₹{Number(inv.grandTotal).toFixed(2)}</td>
                     <td style={{ textAlign: 'right' }}>
                       <button 
                         className="btn btn-secondary" 
@@ -151,7 +151,7 @@ function Invoices({ token, business }) {
 
             <div className="receipt-wrapper">
               <div className="receipt-header">
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>{business.name}</h2>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 600, margin: 0 }}>{business.name}</h2>
                 <p style={{ fontSize: '0.75rem', color: '#475569', margin: '4px 0 0 0' }}>{business.address}</p>
               </div>
 

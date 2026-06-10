@@ -15,10 +15,10 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-function Login({ onLoginSuccess }) {
+function Login({ onLoginSuccess, securityMessage }) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
-  const [step, setStep] = useState(1); // 1 = Mobile input, 2 = OTP verification
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -261,6 +261,21 @@ function Login({ onLoginSuccess }) {
                 <span>Enter OTP</span>
               </div>
             </div>
+
+            {/* Security kick-out banner (shown when auto-redirected) */}
+            {securityMessage && (
+              <div style={{
+                background: '#fef2f2', border: '1px solid #fee2e2',
+                borderRadius: '8px', padding: '12px 14px',
+                display: 'flex', alignItems: 'flex-start', gap: '10px',
+                marginBottom: '16px'
+              }}>
+                <Lock size={16} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+                <span style={{ fontSize: '0.82rem', color: '#b91c1c', lineHeight: 1.5 }}>
+                  {securityMessage}
+                </span>
+              </div>
+            )}
 
             {error && (
               <div className="alert-banner error mb-4" style={{ margin: '0 0 16px 0' }}>
