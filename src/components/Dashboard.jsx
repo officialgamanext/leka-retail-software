@@ -21,6 +21,7 @@ import POS from './POS';
 import Items from './Items';
 import Invoices from './Invoices';
 import Settings from './Settings';
+import Customers from './Customers';
 import ComingSoonPage from './ComingSoonPage';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -434,6 +435,8 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
         );
       case 'invoices':
         return renderPageWithBreadcrumb('Sales History', <Invoices token={token} business={business} />);
+      case 'customers':
+        return renderPageWithBreadcrumb('Customer Directory', <Customers token={token} business={business} />);
       case 'settings':
         return renderPageWithBreadcrumb('Settings',
           <Settings token={token} business={business} user={user} onSwitchBusiness={onSwitchBusiness} onLogout={onLogout} />
