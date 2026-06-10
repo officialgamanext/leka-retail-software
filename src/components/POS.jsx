@@ -594,7 +594,7 @@ function POS({ token, business, printerCharacteristic }) {
                         value={scanInput}
                         onChange={(e) => setScanInput(e.target.value)}
                         autoFocus
-                        style={{ paddingLeft: '38px', background: '#f9fafb' }}
+                        style={{ paddingLeft: '38px', background: '#f9fafb', color: '#0f172a' }}
                       />
                     </div>
                     <button type="submit" className="btn-blue-primary" style={{ width: 'auto', padding: '10px 20px', fontSize: '0.85rem' }}>
@@ -701,7 +701,7 @@ function POS({ token, business, printerCharacteristic }) {
                     placeholder="Search item by name or short code..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ paddingLeft: '36px', background: '#f9fafb', fontSize: '0.85rem', padding: '8px 12px 8px 36px' }}
+                    style={{ paddingLeft: '36px', background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', padding: '8px 12px 8px 36px', width: '100%' }}
                   />
                 </div>
 
@@ -837,7 +837,7 @@ function POS({ token, business, printerCharacteristic }) {
                     placeholder="Search historical bills by Invoice No. or Client info..."
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    style={{ paddingLeft: '36px', background: '#f9fafb', fontSize: '0.85rem', padding: '8px 12px 8px 36px' }}
+                    style={{ paddingLeft: '36px', background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', padding: '8px 12px 8px 36px', width: '100%' }}
                   />
                 </div>
                 <button 
@@ -969,7 +969,7 @@ function POS({ token, business, printerCharacteristic }) {
                     // Slight delay to allow clicking suggestions before hiding
                     setTimeout(() => setShowCustomerDropdown(false), 200);
                   }}
-                  style={{ background: '#f9fafb', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
+                  style={{ background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
                 />
 
                 {showCustomerDropdown && customerPhone.trim() && (
@@ -1035,7 +1035,7 @@ function POS({ token, business, printerCharacteristic }) {
                   placeholder="Walk-in Customer"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  style={{ background: '#f9fafb', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
+                  style={{ background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
                 />
               </div>
             </div>
@@ -1068,7 +1068,7 @@ function POS({ token, business, printerCharacteristic }) {
                     placeholder="0.00"
                     value={discount}
                     onChange={(e) => setDiscount(Math.max(0, Number(e.target.value)))}
-                    style={{ width: '100px', textAlign: 'right', padding: '6px 10px', fontSize: '0.82rem', background: '#f9fafb' }}
+                    style={{ width: '100px', textAlign: 'right', padding: '6px 10px', fontSize: '0.82rem', background: '#f9fafb', color: '#0f172a' }}
                   />
                 </div>
               </div>
@@ -1417,7 +1417,7 @@ function POS({ token, business, printerCharacteristic }) {
                   placeholder="e.g. 9876543210"
                   value={newCustomerPhone}
                   onChange={(e) => setNewCustomerPhone(e.target.value)}
-                  style={{ background: '#f9fafb', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
+                  style={{ background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1431,7 +1431,7 @@ function POS({ token, business, printerCharacteristic }) {
                   value={newCustomerName}
                   onChange={(e) => setNewCustomerName(e.target.value)}
                   autoFocus
-                  style={{ background: '#f9fafb', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
+                  style={{ background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
                 />
               </div>
             </div>
