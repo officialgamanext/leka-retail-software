@@ -25,6 +25,7 @@ import Customers from './Customers';
 import ComingSoonPage from './ComingSoonPage';
 import DashboardPage from './DashboardPage';
 import Expenses from './Expenses';
+import StaffPage from './StaffPage';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -43,20 +44,6 @@ const MODULE_CONFIG = {
       { icon: <TrendingDown />, label: 'Cost Analysis', desc: 'Track cost trends and negotiate better deals' },
       { icon: <Package />, label: 'Stock Receiving', desc: 'Record goods received and update inventory automatically' },
       { icon: <Star />, label: 'Supplier Ratings', desc: 'Rate and review vendor performance over time' },
-    ]
-  },
-  staff: {
-    title: 'Staff',
-    desc: 'Control who has access to your business terminal and what permissions they hold.',
-    icon: <ShieldAlert />,
-    colorClass: 'pink',
-    features: [
-      { icon: <UserPlus />, label: 'Add Team Members', desc: 'Invite cashiers, managers, and accountants' },
-      { icon: <Shield />, label: 'Role Management', desc: 'Assign Admin, Manager, or Cashier roles' },
-      { icon: <Key />, label: 'Permissions Control', desc: 'Granular access control per module and action' },
-      { icon: <Activity />, label: 'Activity Log', desc: 'Track all actions taken by each user' },
-      { icon: <Settings2 />, label: 'Session Control', desc: 'Force logout and manage active sessions' },
-      { icon: <Phone />, label: 'OTP Login', desc: 'All users log in securely via SMS OTP' },
     ]
   },
   stock: {
@@ -110,22 +97,25 @@ const TAB_TO_PATH = {
 // ─── Dashboard Component ──────────────────────────────────────────────────────
 function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
   const [activeTabVal, setActiveTabVal] = useState(() => {
+    if (business.isStaff) return 'pos';
     return PATH_TO_TAB[window.location.pathname] || 'home';
   });
 
   const setActiveTab = useCallback((tabId) => {
+    if (business.isStaff) return; // Disable tab switching for staff entirely
     const path = TAB_TO_PATH[tabId];
     if (path && window.location.pathname !== path) {
       window.history.pushState(null, '', path);
       window.dispatchEvent(new PopStateEvent('popstate'));
     }
     setActiveTabVal(tabId);
-  }, []);
+  }, [business.isStaff]);
 
-  const activeTab = activeTabVal;
+  const activeTab = business.isStaff ? 'pos' : activeTabVal;
 
   useEffect(() => {
     const handlePopState = () => {
+      if (business.isStaff) return; // Prevent history navigation changing tabs for staff
       const tab = PATH_TO_TAB[window.location.pathname];
       if (tab) {
         setActiveTabVal(tab);
@@ -133,7 +123,7 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [business.isStaff]);
 
   const [subscriptionKicked, setSubscriptionKicked] = useState(false);
   const [showStoreDropdown, setShowStoreDropdown]   = useState(false);
@@ -342,6 +332,17 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
 
       // ── Fully implemented pages ──
       case 'pos':
+        if (business.isStaff) {
+          return (
+            <div className="light-dashboard-content" style={{ padding: '24px 32px' }}>
+              <POS 
+                token={token} 
+                business={business} 
+                printerCharacteristic={printerCharacteristic} 
+              />
+            </div>
+          );
+        }
         return renderPageWithBreadcrumb('Billing', 
           <POS 
             token={token} 
@@ -362,6 +363,8 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
         return renderPageWithBreadcrumb('Customer', <Customers token={token} business={business} />);
       case 'expenses':
         return renderPageWithBreadcrumb('Expenses', <Expenses token={token} business={business} />);
+      case 'staff':
+        return renderPageWithBreadcrumb('Staff', <StaffPage token={token} business={business} />);
       case 'settings':
         return renderPageWithBreadcrumb('Settings',
           <Settings token={token} business={business} user={user} onSwitchBusiness={onSwitchBusiness} onLogout={onLogout} />
@@ -431,8 +434,12 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
       <header className="home-topbar">
         {/* Brand Logo */}
         <div
-          onClick={() => setActiveTab('home')}
-          style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+          onClick={() => {
+            if (!business.isStaff) {
+              setActiveTab('home');
+            }
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: business.isStaff ? 'default' : 'pointer' }}
         >
           <div className="brand-icon-box" style={{ width: '40px', height: '40px', borderRadius: '10px', margin: 0 }}>
             <ShoppingCart size={20} strokeWidth={2.5} />
@@ -531,7 +538,9 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
               <div className="user-avatar" style={{ margin: 0, backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid rgba(37,99,235,0.1)' }}>
                 <User size={16} />
               </div>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>Admin ⌵</span>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
+                {business.isStaff ? 'Staff ⌵' : 'Admin ⌵'}
+              </span>
             </div>
             {showAdminDropdown && (
               <div className="dots-dropdown-menu" style={{ width: '160px', top: '42px' }}>
@@ -540,10 +549,17 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
                   <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', fontFamily: 'monospace', marginTop: '2px' }}>
                     {user?.phone}
                   </p>
+                  {business.isStaff && (
+                    <p style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginTop: '4px' }}>
+                      Staff Session
+                    </p>
+                  )}
                 </div>
-                <button className="dots-menu-item" onClick={() => { setShowAdminDropdown(false); setActiveTab('settings'); }}>
-                  Configure Profile
-                </button>
+                {!business.isStaff && (
+                  <button className="dots-menu-item" onClick={() => { setShowAdminDropdown(false); setActiveTab('settings'); }}>
+                    Configure Profile
+                  </button>
+                )}
                 <button className="dots-menu-item danger-action" onClick={onLogout}>
                   <LogOut size={12} /> Log Out
                 </button>

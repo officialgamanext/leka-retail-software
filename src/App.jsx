@@ -182,7 +182,11 @@ function App() {
     setSecurityMessage('');
     localStorage.setItem('leka_business', JSON.stringify(business));
     setSelectedBusiness(business);
-    navigate('/dashboard');
+    if (business.isStaff) {
+      navigate('/billing');
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   // ─── Routing Guards and Redirects Effect ──────────────────────────────────
@@ -199,12 +203,20 @@ function App() {
       }
     } else {
       // Authenticated with business selected
-      const allowedPaths = [
-        '/dashboard', '/billing', '/products', '/customer',
-        '/vendors', '/staff', '/expenses', '/stock', '/settings', '/home'
-      ];
-      if (!allowedPaths.includes(currentPath)) {
-        navigate('/home');
+      if (selectedBusiness.isStaff) {
+        // Staff member - strictly lock browsing path to /billing
+        if (currentPath !== '/billing') {
+          navigate('/billing');
+        }
+      } else {
+        // Owner - allow standard routes
+        const allowedPaths = [
+          '/dashboard', '/billing', '/products', '/customer',
+          '/vendors', '/staff', '/expenses', '/stock', '/settings', '/home'
+        ];
+        if (!allowedPaths.includes(currentPath)) {
+          navigate('/home');
+        }
       }
     }
   }, [loading, token, user, selectedBusiness, currentPath, navigate]);
