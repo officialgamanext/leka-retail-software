@@ -4,10 +4,11 @@ import JsBarcode from 'jsbarcode';
 import {
   Package, Tag, Plus, Search, Trash2, Edit, X, Loader2,
   AlertTriangle, Barcode, Image as ImageIcon, ChevronDown,
-  CheckCircle, RefreshCw, Upload, Eye
+  CheckCircle, RefreshCw, Upload, Eye, Download, Printer
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL;
+const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=400&auto=format&fit=crop&q=60';
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function generateBarcodeValue() {
@@ -77,6 +78,40 @@ function compressImage(base64Str, targetSizeKB = 50) {
     };
     img.onerror = (err) => reject(err);
   });
+}
+
+function parseCSV(text) {
+  const lines = [];
+  let row = [""];
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    const next = text[i+1];
+    
+    if (c === '"') {
+      if (inQuotes && next === '"') {
+        row[row.length - 1] += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      row.push('');
+    } else if ((c === '\r' || c === '\n') && !inQuotes) {
+      if (c === '\r' && next === '\n') {
+        i++;
+      }
+      lines.push(row);
+      row = [''];
+    } else {
+      row[row.length - 1] += c;
+    }
+  }
+  if (row.length > 1 || row[0] !== '') {
+    lines.push(row);
+  }
+  return lines;
 }
 
 // ─── Custom Category Dropdown ─────────────────────────────────────────────────
@@ -200,6 +235,16 @@ function Items({ token, business }) {
   const [showItemForm,    setShowItemForm]   = useState(false);
   const [editingItem,     setEditingItem]    = useState(null);
   const [viewingItem,     setViewingItem]    = useState(null);
+  const [showBulkUpload,  setShowBulkUpload] = useState(false);
+  const [bulkItems,       setBulkItems]      = useState([]);
+  const [bulkUploading,   setBulkUploading]  = useState(false);
+  const [bulkProgress,    setBulkProgress]   = useState({ total: 0, current: 0, successCount: 0, failCount: 0 });
+  const [bulkErrors,      setBulkErrors]     = useState([]);
+
+  // Bluetooth Printer states
+  const [printerDevice, setPrinterDevice] = useState(null);
+  const [printerCharacteristic, setPrinterCharacteristic] = useState(null);
+  const [printerConnecting, setPrinterConnecting] = useState(false);
 
   // Item form fields
   const [itemName,        setItemName]       = useState('');
@@ -430,6 +475,371 @@ function Items({ token, business }) {
     }
   };
 
+  // ────────────────────────────────────────────────────────────────────────────
+  //  BULK UPLOAD HANDLERS
+  // ────────────────────────────────────────────────────────────────────────────
+  const handleDownloadTemplate = () => {
+    const headersList = [
+      'Name',
+      'Short Code',
+      'Price',
+      'GST Rate',
+      'Stock',
+      'Buffer Stock',
+      'Category Name',
+      'Barcode',
+      'Image URL'
+    ];
+    const exampleRow = [
+      'Parle-G Biscuit 100g',
+      'PRLG001',
+      '10.00',
+      '18',
+      '100',
+      '10',
+      'Groceries',
+      '',
+      ''
+    ];
+    const csvContent = [headersList.join(','), exampleRow.join(',')].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "leka_items_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target.result;
+      const parsed = parseCSV(text);
+      if (parsed.length < 2) {
+        alert("The selected CSV file appears to be empty or missing data.");
+        return;
+      }
+      
+      const fileHeaders = parsed[0].map(h => h.trim().toLowerCase());
+      const itemsToImport = [];
+      
+      for (let i = 1; i < parsed.length; i++) {
+        const row = parsed[i];
+        if (row.length === 1 && row[0] === '') continue;
+        
+        const item = {};
+        fileHeaders.forEach((header, index) => {
+          const val = row[index] ? row[index].trim() : '';
+          if (header === 'name') item.name = val;
+          else if (header === 'short code' || header === 'shortcode') item.shortCode = val;
+          else if (header === 'price') item.price = val;
+          else if (header === 'gst rate' || header === 'gstrate') item.gstRate = val;
+          else if (header === 'stock') item.stock = val;
+          else if (header === 'buffer stock' || header === 'bufferstock') item.bufferStock = val;
+          else if (header === 'category name' || header === 'categoryname') item.categoryName = val;
+          else if (header === 'barcode') item.barcode = val;
+          else if (header === 'image url' || header === 'imageurl') item.imageUrl = val;
+        });
+        
+        if (item.name && item.price) {
+          itemsToImport.push(item);
+        }
+      }
+      
+      setBulkItems(itemsToImport);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleStartImport = async () => {
+    if (bulkItems.length === 0) return;
+    
+    setBulkUploading(true);
+    setBulkProgress({
+      total: bulkItems.length,
+      current: 0,
+      successCount: 0,
+      failCount: 0
+    });
+    setBulkErrors([]);
+    
+    const errorsList = [];
+    let success = 0;
+    let fail = 0;
+    
+    // Copy categories array so we don't cause state concurrency issues while mutating locally
+    const catsCopy = [...categories];
+    
+    for (let i = 0; i < bulkItems.length; i++) {
+      const rawItem = bulkItems[i];
+      setBulkProgress(prev => ({
+        ...prev,
+        current: i + 1
+      }));
+      
+      try {
+        // 1. Resolve category
+        let categoryId = '';
+        let categoryName = rawItem.categoryName || 'Uncategorised';
+        
+        if (rawItem.categoryName && rawItem.categoryName.trim()) {
+          const trimmedCat = rawItem.categoryName.trim();
+          let existingCat = catsCopy.find(c => c.name.toLowerCase() === trimmedCat.toLowerCase());
+          if (!existingCat) {
+            const catRes = await axios.post(`${API_URL}/categories`, { name: trimmedCat }, { headers: headers() });
+            if (catRes.data.success) {
+              existingCat = catRes.data.category;
+              setCategories(prev => [existingCat, ...prev]);
+              catsCopy.push(existingCat);
+            }
+          }
+          if (existingCat) {
+            categoryId = existingCat.id;
+            categoryName = existingCat.name;
+          }
+        }
+        
+        // 2. Barcode generation & upload
+        const barcodeValue = rawItem.barcode && rawItem.barcode.trim() ? rawItem.barcode.trim() : generateBarcodeValue();
+        let barcodeImgUrl = '';
+        
+        try {
+          const canvas = renderBarcodeToCanvas(barcodeValue);
+          const barcodeBase64 = canvas.toDataURL();
+          barcodeImgUrl = await uploadToImageKit(
+            barcodeBase64,
+            `barcode_${barcodeValue}.png`,
+            '/leka-retail/barcodes'
+          );
+        } catch (barErr) {
+          console.error("Barcode canvas / upload failed", barErr);
+        }
+        
+        // 3. Image URL fallback
+        const imageUrl = rawItem.imageUrl && rawItem.imageUrl.trim() ? rawItem.imageUrl.trim() : DEFAULT_PRODUCT_IMAGE;
+        
+        // 4. Save to API
+        const payload = {
+          name:            rawItem.name.trim(),
+          shortCode:       (rawItem.shortCode || '').trim(),
+          price:           Number(rawItem.price),
+          gstRate:         Number(rawItem.gstRate || 18),
+          stock:           Number(rawItem.stock || 0),
+          bufferStock:     Number(rawItem.bufferStock || 0),
+          categoryId,
+          categoryName,
+          barcode:         barcodeValue,
+          imageUrl,
+          barcodeImageUrl: barcodeImgUrl
+        };
+        
+        await axios.post(`${API_URL}/products`, payload, { headers: headers() });
+        success++;
+        setBulkProgress(prev => ({ ...prev, successCount: success }));
+      } catch (err) {
+        fail++;
+        const errMsg = err.response?.data?.message || err.message || 'Unknown error';
+        errorsList.push(`Row ${i + 2} (${rawItem.name}): ${errMsg}`);
+        setBulkErrors([...errorsList]);
+        setBulkProgress(prev => ({ ...prev, failCount: fail }));
+      }
+    }
+    
+    fetchItems();
+    setBulkUploading(false);
+  };
+
+  // ────────────────────────────────────────────────────────────────────────────
+  //  BLUETOOTH PRINTER HANDLERS
+  // ────────────────────────────────────────────────────────────────────────────
+  const handleConnectPrinter = async () => {
+    if (printerDevice && printerDevice.gatt.connected) {
+      try {
+        await printerDevice.gatt.disconnect();
+      } catch (err) {
+        console.error(err);
+      }
+      setPrinterDevice(null);
+      setPrinterCharacteristic(null);
+      return;
+    }
+
+    setPrinterConnecting(true);
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [
+          '000018f0-0000-1000-8000-00805f9b34fb', // General Printer Service
+          '0000fff0-0000-1000-8000-00805f9b34fb', // Common thermal service
+          '0000e7e1-0000-1000-8000-00805f9b34fb'  // Another common service
+        ]
+      });
+
+      const server = await device.gatt.connect();
+      const services = await server.getPrimaryServices();
+      let characteristic = null;
+
+      for (const service of services) {
+        const characteristics = await service.getCharacteristics();
+        const writeChar = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
+        if (writeChar) {
+          characteristic = writeChar;
+          break;
+        }
+      }
+
+      if (!characteristic) {
+        throw new Error("Could not find a write characteristic on the printer.");
+      }
+
+      setPrinterDevice(device);
+      setPrinterCharacteristic(characteristic);
+      
+      device.addEventListener('gattserverdisconnected', () => {
+        setPrinterDevice(null);
+        setPrinterCharacteristic(null);
+      });
+      
+      alert(`Connected to ${device.name || 'Printer'} successfully!`);
+    } catch (err) {
+      alert(`Connection failed: ${err.message}`);
+    } finally {
+      setPrinterConnecting(false);
+    }
+  };
+
+  const handlePrintBarcode = async (item) => {
+    if (!printerCharacteristic) {
+      alert("Please connect the Bluetooth Thermal Printer first using the button in the header.");
+      return;
+    }
+
+    try {
+      const barcodeData = item.barcode;
+      if (!barcodeData) {
+        alert("This item does not have a barcode to print.");
+        return;
+      }
+
+      const encoder = new TextEncoder();
+      const commands = [];
+
+      // Initialize printer (ESC @)
+      commands.push(0x1B, 0x40);
+
+      // Center align (ESC a 1)
+      commands.push(0x1B, 0x61, 0x01);
+
+      // Print product name
+      const nameBytes = encoder.encode(`${item.name}\n`);
+      commands.push(...nameBytes);
+
+      // Set barcode height to 80 dots (GS h 80)
+      commands.push(0x1D, 0x68, 0x50);
+
+      // Set barcode width (GS w 2)
+      commands.push(0x1D, 0x77, 0x02);
+
+      // Set HRI characters position below barcode (GS H 2)
+      commands.push(0x1D, 0x48, 0x02);
+
+      // Print barcode (Code 128 System B)
+      const barcodeBytes = encoder.encode(barcodeData);
+      const length = barcodeBytes.length + 2; // +2 for subset selectors
+      commands.push(0x1D, 0x6B, 0x49, length, 0x7B, 0x42, ...barcodeBytes);
+
+      // Feed paper 3 lines (ESC d 3)
+      commands.push(0x1B, 0x64, 0x03);
+
+      const data = new Uint8Array(commands);
+      
+      // Chunk write in 20-byte payloads to fit standard BLE GATT MTU limitations
+      const chunkSize = 20;
+      for (let offset = 0; offset < data.length; offset += chunkSize) {
+        const chunk = data.slice(offset, offset + chunkSize);
+        await printerCharacteristic.writeValue(chunk);
+      }
+    } catch (err) {
+      alert(`Printing failed: ${err.message}`);
+    }
+  };
+
+  const handlePrintAllBarcodes = async () => {
+    if (!printerCharacteristic) {
+      alert("Please connect the Bluetooth Thermal Printer first using the button in the header.");
+      return;
+    }
+
+    const itemsToPrint = filteredItems;
+    if (itemsToPrint.length === 0) {
+      alert("No items available to print.");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to print barcodes for all ${itemsToPrint.length} listed item(s)?`)) {
+      return;
+    }
+
+    try {
+      const encoder = new TextEncoder();
+      
+      for (let i = 0; i < itemsToPrint.length; i++) {
+        const item = itemsToPrint[i];
+        const barcodeData = item.barcode;
+        if (!barcodeData) continue;
+
+        const commands = [];
+
+        // Initialize printer (ESC @)
+        commands.push(0x1B, 0x40);
+
+        // Center align (ESC a 1)
+        commands.push(0x1B, 0x61, 0x01);
+
+        // Print product name
+        const nameBytes = encoder.encode(`${item.name}\n`);
+        commands.push(...nameBytes);
+
+        // Set barcode height to 80 dots (GS h 80)
+        commands.push(0x1D, 0x68, 0x50);
+
+        // Set barcode width (GS w 2)
+        commands.push(0x1D, 0x77, 0x02);
+
+        // Set HRI characters position below barcode (GS H 2)
+        commands.push(0x1D, 0x48, 0x02);
+
+        // Print barcode (Code 128 System B)
+        const barcodeBytes = encoder.encode(barcodeData);
+        const length = barcodeBytes.length + 2; // +2 for subset selectors
+        commands.push(0x1D, 0x6B, 0x49, length, 0x7B, 0x42, ...barcodeBytes);
+
+        // Feed paper 3 lines (ESC d 3)
+        commands.push(0x1B, 0x64, 0x03);
+
+        const data = new Uint8Array(commands);
+        
+        // Chunk write in 20-byte payloads
+        const chunkSize = 20;
+        for (let offset = 0; offset < data.length; offset += chunkSize) {
+          const chunk = data.slice(offset, offset + chunkSize);
+          await printerCharacteristic.writeValue(chunk);
+        }
+
+        // Delay between print jobs to allow the printer's motor/buffer to keep up
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+      alert("All print jobs successfully sent to the printer!");
+    } catch (err) {
+      alert(`Printing failed: ${err.message}`);
+    }
+  };
+
   // ── Filtered lists ──────────────────────────────────────────────────────────
   const filteredCats  = categories.filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase()));
   const filteredItems = items.filter(p =>
@@ -457,9 +867,41 @@ function Items({ token, business }) {
           </p>
         </div>
 
+        {/* Bluetooth Printer Connection */}
+        <button
+          type="button"
+          onClick={handleConnectPrinter}
+          disabled={printerConnecting}
+          style={{
+            marginLeft: 'auto',
+            marginRight: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: printerDevice ? '#f0fdf4' : '#2563eb',
+            color: printerDevice ? '#16a34a' : '#ffffff',
+            border: printerDevice ? '1px solid #bbf7d0' : 'none',
+            borderRadius: '8px',
+            padding: '8px 16px',
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            boxShadow: printerDevice ? 'none' : '0 2px 6px rgba(37, 99, 235, 0.15)',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          {printerConnecting ? (
+            <><Loader2 className="animate-spin" size={14} /> Connecting...</>
+          ) : printerDevice ? (
+            <><CheckCircle size={14} /> Printer Connected</>
+          ) : (
+            <><Printer size={14} /> Connect Bluetooth Printer</>
+          )}
+        </button>
+
         {/* Tab Switcher */}
         <div style={{
-          marginLeft: 'auto', display: 'flex', background: '#f3f4f6',
+          display: 'flex', background: '#f3f4f6',
           borderRadius: '10px', padding: '4px'
         }}>
           {['items', 'categories'].map(tab => (
@@ -655,6 +1097,21 @@ function Items({ token, business }) {
                 />
               </div>
               <button
+                className="btn-secondary"
+                onClick={() => { setShowBulkUpload(true); setBulkItems([]); setBulkErrors([]); }}
+                style={{ width: 'auto', padding: '9px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap', border: '1px solid #cbd5e1', background: '#ffffff', color: '#4b5563', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Upload size={14} /> Bulk Upload
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={handlePrintAllBarcodes}
+                style={{ width: 'auto', padding: '9px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap', border: '1px solid #cbd5e1', background: '#ffffff', color: '#7c3aed', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                title={printerDevice ? "Print all listed barcodes" : "Connect printer first to print"}
+              >
+                <Printer size={14} /> Print All
+              </button>
+              <button
                 className="btn-blue-primary"
                 onClick={handleOpenAddItem}
                 style={{ width: 'auto', padding: '9px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
@@ -760,6 +1217,18 @@ function Items({ token, business }) {
                         </td>
                         <td style={{ padding: '12px 16px' }}>
                           <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handlePrintBarcode(item)}
+                              style={{
+                                background: '#f5f3ff', border: 'none', color: '#7c3aed',
+                                borderRadius: '6px', padding: '5px 10px', fontSize: '0.78rem',
+                                fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                              }}
+                              title={printerDevice ? "Print Barcode" : "Connect printer first to print"}
+                            >
+                              <Printer size={11} /> Print
+                            </button>
                             <button
                               type="button"
                               onClick={() => setViewingItem(item)}
@@ -1150,6 +1619,153 @@ function Items({ token, business }) {
                 <Edit size={14} /> Edit Item
               </button>
               <button type="button" onClick={() => setViewingItem(null)} style={{ background: '#f3f4f6', border: 'none', color: '#4b5563', borderRadius: '8px', padding: '8px 16px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Upload Modal ── */}
+      {showBulkUpload && (
+        <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-content" style={{ background: '#ffffff', color: '#1f2937', maxWidth: '650px', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', padding: '24px' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Upload size={18} style={{ color: '#2563eb' }} /> Bulk Import Items
+              </h3>
+              <button type="button" onClick={() => { if (!bulkUploading) setShowBulkUpload(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }} disabled={bulkUploading}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Step 1: Download Template */}
+            {!bulkUploading && bulkItems.length === 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ background: '#eff6ff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <Download size={20} style={{ color: '#2563eb', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e40af', marginBottom: '4px' }}>Step 1: Download Template</h4>
+                    <p style={{ fontSize: '0.8rem', color: '#60a5fa', lineHeight: '1.4' }}>
+                      Get our pre-formatted CSV template. Add your inventory items, short codes, pricing, stock levels, and category mappings. Leave barcode blank to automatically generate unique EAN values.
+                    </p>
+                    <button type="button" onClick={handleDownloadTemplate} style={{ marginTop: '10px', background: '#2563eb', border: 'none', color: '#ffffff', borderRadius: '6px', padding: '6px 12px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Download size={12} /> Download CSV Template
+                    </button>
+                  </div>
+                </div>
+
+                {/* Step 2: Upload */}
+                <div style={{ border: '2px dashed #cbd5e1', borderRadius: '12px', padding: '32px 16px', textAlign: 'center', background: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => document.getElementById('csv-file-input').click()}>
+                  <Upload size={32} style={{ color: '#94a3b8' }} />
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#475569' }}>Upload populated CSV file</span>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Click to browse computer</span>
+                  <input id="csv-file-input" type="file" accept=".csv" onChange={handleFileChange} style={{ display: 'none' }} />
+                </div>
+              </div>
+            )}
+
+            {/* Preview of loaded CSV */}
+            {!bulkUploading && bulkItems.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#6b7280', fontWeight: 600 }}>Parsed {bulkItems.length} valid item(s)</span>
+                  <button type="button" onClick={() => setBulkItems([])} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+                    Clear and upload another file
+                  </button>
+                </div>
+
+                <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#4b5563' }}>Item Name</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#4b5563' }}>Short Code</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#4b5563' }}>Price</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#4b5563' }}>Stock</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkItems.slice(0, 10).map((itm, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '8px 12px', color: '#1f2937' }}>{itm.name}</td>
+                          <td style={{ padding: '8px 12px', color: '#4b5563', fontFamily: 'monospace' }}>{itm.shortCode || '—'}</td>
+                          <td style={{ padding: '8px 12px', color: '#0f172a', fontWeight: 600 }}>₹{itm.price}</td>
+                          <td style={{ padding: '8px 12px', color: '#4b5563' }}>{itm.stock || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {bulkItems.length > 10 && (
+                    <div style={{ padding: '8px 12px', textAlign: 'center', background: '#f9fafb', color: '#9ca3af', fontSize: '0.75rem', borderTop: '1px solid #e5e7eb' }}>
+                      And {bulkItems.length - 10} more items...
+                    </div>
+                  )}
+                </div>
+
+                <button type="button" onClick={handleStartImport} style={{ background: '#2563eb', border: 'none', color: '#ffffff', borderRadius: '8px', padding: '10px 16px', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <Plus size={16} /> Import all {bulkItems.length} items
+                </button>
+              </div>
+            )}
+
+            {/* Uploading progress status */}
+            {(bulkUploading || (bulkProgress.total > 0 && !bulkUploading)) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#0f172a' }}>
+                    {bulkUploading ? `Processing item ${bulkProgress.current} of ${bulkProgress.total}...` : 'Import Completed'}
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                    {Math.round((bulkProgress.current / bulkProgress.total) * 100)}%
+                  </span>
+                </div>
+
+                {/* Progress Bar */}
+                <div style={{ height: '8px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden', width: '100%' }}>
+                  <div style={{ height: '100%', background: '#2563eb', width: `${(bulkProgress.current / bulkProgress.total) * 100}%`, transition: 'width 0.15s ease' }}></div>
+                </div>
+
+                {/* Status breakdown */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', textAlign: 'center' }}>
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#16a34a', display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>Imported</span>
+                    <span style={{ fontSize: '1.2rem', fontWeight: 600, color: '#15803d' }}>{bulkProgress.successCount}</span>
+                  </div>
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#ef4444', display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>Failed</span>
+                    <span style={{ fontSize: '1.2rem', fontWeight: 600, color: '#b91c1c' }}>{bulkProgress.failCount}</span>
+                  </div>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#6b7280', display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>Pending</span>
+                    <span style={{ fontSize: '1.2rem', fontWeight: 600, color: '#374151' }}>{bulkProgress.total - bulkProgress.current}</span>
+                  </div>
+                </div>
+
+                {/* Failure error log list */}
+                {bulkErrors.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <AlertTriangle size={13} /> Failure Details ({bulkErrors.length})
+                    </span>
+                    <div style={{ maxHeight: '120px', overflowY: 'auto', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {bulkErrors.map((err, index) => (
+                        <div key={index} style={{ fontSize: '0.75rem', color: '#b91c1c', lineHeight: '1.4', borderBottom: index < bulkErrors.length - 1 ? '1px dashed #fecaca' : 'none', paddingBottom: '4px' }}>
+                          {err}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #f3f4f6', paddingTop: '16px', marginTop: '20px' }}>
+              <button type="button" onClick={() => { if (!bulkUploading) setShowBulkUpload(false); }} style={{ background: '#f3f4f6', border: 'none', color: '#4b5563', borderRadius: '8px', padding: '8px 16px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }} disabled={bulkUploading}>
                 Close
               </button>
             </div>
