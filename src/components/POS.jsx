@@ -4,7 +4,7 @@ import {
   Search, ShoppingBag, Trash2, Tag, CreditCard, Banknote, 
   Landmark, Loader2, Sparkles, ReceiptText, Barcode, Eye, 
   Plus, Minus, CheckCircle, Printer, AlertTriangle, Play, X, Wallet, RefreshCw,
-  UserPlus, Camera
+  UserPlus, Camera, MapPin
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
@@ -51,8 +51,14 @@ function POS({ token, business, printerCharacteristic }) {
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerAddress, setNewCustomerAddress] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [customerDirectory, setCustomerDirectory] = useState([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [showCameraScanner, setShowCameraScanner] = useState(false);
+  const [customerModalSaving, setCustomerModalSaving] = useState(false);
+  const [customerModalError, setCustomerModalError] = useState('');
 
   // Shared Headers
   const headers = useCallback(() => ({
@@ -65,6 +71,7 @@ function POS({ token, business, printerCharacteristic }) {
     fetchProducts();
     fetchCategories();
     fetchHistory();
+    fetchCustomerDirectory();
   }, [business.id]);
 
   const fetchProducts = async () => {
@@ -104,6 +111,78 @@ function POS({ token, business, printerCharacteristic }) {
       console.error('Failed to load invoice history', err);
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const fetchCustomerDirectory = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/customers`, { headers: headers() });
+      if (response.data.success) {
+        setCustomerDirectory(response.data.customers);
+      }
+    } catch (err) {
+      console.error('Failed to load customer directory', err);
+    }
+  };
+
+  const handleOpenAddCustomerModal = () => {
+    const query = customerSearchQuery.trim();
+    const isDigits = /^\d+$/.test(query);
+    if (isDigits) {
+      setNewCustomerPhone(query);
+      setNewCustomerName('');
+    } else {
+      setNewCustomerPhone('');
+      setNewCustomerName(query);
+    }
+    setNewCustomerAddress('');
+    setCustomerModalError('');
+    setShowAddCustomerModal(true);
+    setShowCustomerDropdown(false);
+  };
+
+  const handleSaveNewCustomer = async (e) => {
+    e.preventDefault();
+    setCustomerModalError('');
+
+    if (!newCustomerName.trim()) {
+      setCustomerModalError('Customer name is required');
+      return;
+    }
+    if (!newCustomerPhone.trim()) {
+      setCustomerModalError('Mobile number is required');
+      return;
+    }
+
+    setCustomerModalSaving(true);
+    try {
+      const response = await axios.post(`${API_URL}/customers`, {
+        name: newCustomerName.trim(),
+        phone: newCustomerPhone.trim(),
+        address: newCustomerAddress.trim()
+      }, { headers: headers() });
+
+      if (response.data.success) {
+        const newCust = response.data.customer;
+        // Update local session array and master directory
+        setLocalCustomers([newCust, ...localCustomers]);
+        setCustomerDirectory([newCust, ...customerDirectory]);
+        
+        // Auto-select the newly saved customer
+        setCustomerPhone(newCust.phone);
+        setCustomerName(newCust.name);
+        setCustomerAddress(newCust.address || '');
+        setCustomerSearchQuery('');
+        
+        setShowAddCustomerModal(false);
+        setNewCustomerName('');
+        setNewCustomerPhone('');
+        setNewCustomerAddress('');
+      }
+    } catch (err) {
+      setCustomerModalError(err.response?.data?.message || 'Failed to save customer');
+    } finally {
+      setCustomerModalSaving(false);
     }
   };
 
@@ -176,33 +255,57 @@ function POS({ token, business, printerCharacteristic }) {
     }
   }, [showCameraScanner, products]);
 
-  // Derived list of unique customers from history + localCustomers
+  // Derived list of unique customers from customerDirectory + history + localCustomers
   const getUniqueCustomers = () => {
     const map = new Map();
+
+    // 1. From database customers
+    customerDirectory.forEach(c => {
+      const phone = (c.phone || '').trim();
+      const name = (c.name || '').trim();
+      const address = (c.address || '').trim();
+      if (phone && name) {
+        map.set(phone, { name, address });
+      }
+    });
+
+    // 2. From billing history
     history.forEach(inv => {
       const phone = (inv.customerPhone || '').trim();
       const name = (inv.customerName || '').trim();
+      const address = (inv.customerAddress || '').trim();
       if (phone && name && name.toLowerCase() !== 'walk-in customer') {
-        map.set(phone, name);
+        if (!map.has(phone)) {
+          map.set(phone, { name, address });
+        }
       }
     });
+
+    // 3. From local session additions
     localCustomers.forEach(c => {
       const phone = (c.phone || '').trim();
       const name = (c.name || '').trim();
+      const address = (c.address || '').trim();
       if (phone && name) {
-        map.set(phone, name);
+        map.set(phone, { name, address });
       }
     });
-    return Array.from(map.entries()).map(([phone, name]) => ({ phone, name }));
+
+    return Array.from(map.entries()).map(([phone, data]) => ({
+      phone,
+      name: data.name,
+      address: data.address
+    }));
   };
 
   const uniqueCustomers = getUniqueCustomers();
-  const filteredCustomers = customerPhone.trim() 
+  const filteredCustomers = customerSearchQuery.trim()
     ? uniqueCustomers.filter(c => 
-        c.phone.includes(customerPhone.trim()) || 
-        c.name.toLowerCase().includes(customerPhone.toLowerCase())
+        c.phone.includes(customerSearchQuery.trim()) || 
+        c.name.toLowerCase().includes(customerSearchQuery.toLowerCase())
       )
-    : [];
+    : uniqueCustomers.slice(0, 10);
+
 
   // Cart Helpers
   const handleAddToCart = (product) => {
@@ -264,6 +367,8 @@ function POS({ token, business, printerCharacteristic }) {
     setCart([]);
     setCustomerName('');
     setCustomerPhone('');
+    setCustomerAddress('');
+    setCustomerSearchQuery('');
     setDiscount(0);
   };
 
@@ -950,94 +1055,156 @@ function POS({ token, business, printerCharacteristic }) {
               <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f3f4f6', paddingBottom: '10px' }}>
                 Customer Information
               </h3>
-              
-              <div style={{ position: 'relative' }}>
-                <label htmlFor="cust-phone" style={{ fontSize: '0.78rem', color: '#4b5563', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
-                  Phone Number
-                </label>
-                <input
-                  id="cust-phone"
-                  type="text"
-                  placeholder="e.g. 9876543210"
-                  value={customerPhone}
-                  onChange={(e) => {
-                    setCustomerPhone(e.target.value);
-                    setShowCustomerDropdown(true);
-                  }}
-                  onFocus={() => setShowCustomerDropdown(true)}
-                  onBlur={() => {
-                    // Slight delay to allow clicking suggestions before hiding
-                    setTimeout(() => setShowCustomerDropdown(false), 200);
-                  }}
-                  style={{ background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
-                />
 
-                {showCustomerDropdown && customerPhone.trim() && (
+              {customerPhone ? (
+                /* Selected customer information preview card */
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  {/* Avatar circle using pastel color scheme matching initials */}
                   <div style={{
-                    position: 'absolute', top: '100%', left: 0, right: 0,
-                    background: '#ffffff', border: '1px solid #cbd5e1',
-                    borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
-                    zIndex: 50, marginTop: '4px', maxHeight: '200px', overflowY: 'auto'
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '36px', height: '36px', borderRadius: '50%',
+                    background: '#eff6ff', color: '#2563eb', fontWeight: 600, fontSize: '0.82rem'
                   }}>
-                    {filteredCustomers.map((cust, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onMouseDown={() => {
-                          setCustomerPhone(cust.phone);
-                          setCustomerName(cust.name);
-                          setShowCustomerDropdown(false);
-                        }}
-                        style={{
-                          width: '100%', padding: '10px 12px', border: 'none',
-                          background: 'none', textAlign: 'left', cursor: 'pointer',
-                          fontSize: '0.8rem', display: 'flex', flexDirection: 'column',
-                          borderBottom: '1px solid #f1f5f9'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-                      >
-                        <span style={{ fontWeight: 600, color: '#1e293b' }}>{cust.phone}</span>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{cust.name}</span>
-                      </button>
-                    ))}
-                    
-                    <button
-                      type="button"
-                      onMouseDown={() => {
-                        setNewCustomerPhone(customerPhone);
-                        setNewCustomerName('');
-                        setShowAddCustomerModal(true);
-                        setShowCustomerDropdown(false);
+                    {customerName ? customerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'C'}
+                  </div>
+                  
+                  {/* Selected customer attributes */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, paddingRight: '20px' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#0f172a' }}>
+                      {customerName || 'Walk-in Customer'}
+                    </span>
+                    <span style={{ fontSize: '0.74rem', color: '#4b5563', fontFamily: 'monospace' }}>
+                      {customerPhone}
+                    </span>
+                    {customerAddress && (
+                      <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                        <MapPin size={10} style={{ color: '#94a3b8' }} /> {customerAddress}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Reset/Clear button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerPhone('');
+                      setCustomerName('');
+                      setCustomerAddress('');
+                      setCustomerSearchQuery('');
+                    }}
+                    style={{
+                      position: 'absolute', top: '10px', right: '10px',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#9ca3af', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                    title="Change Customer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                /* Unified Customer Search Input & suggestions dropdown */
+                <div style={{ position: 'relative' }}>
+                  <label htmlFor="cust-search" style={{ fontSize: '0.78rem', color: '#4b5563', fontWeight: 500, display: 'block', marginBottom: '6px' }}>
+                    Search Customer
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: '#9ca3af' }} />
+                    <input
+                      id="cust-search"
+                      type="text"
+                      placeholder="Type name or mobile number..."
+                      value={customerSearchQuery}
+                      onChange={(e) => {
+                        setCustomerSearchQuery(e.target.value);
+                        setShowCustomerDropdown(true);
+                      }}
+                      onFocus={() => setShowCustomerDropdown(true)}
+                      onBlur={() => {
+                        // Delay dropdown close to registerMouseDown clicks
+                        setTimeout(() => setShowCustomerDropdown(false), 200);
                       }}
                       style={{
-                        width: '100%', padding: '10px 12px', border: 'none',
-                        background: '#f0fdf4', color: '#15803d', textAlign: 'left',
-                        cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600,
-                        display: 'flex', alignItems: 'center', gap: '6px'
+                        paddingLeft: '34px', background: '#f9fafb', color: '#0f172a',
+                        fontSize: '0.85rem', width: '100%', boxSizing: 'border-box',
+                        height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#dcfce7'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = '#f0fdf4'}
-                    >
-                      <Plus size={14} /> + Add New Customer
-                    </button>
+                    />
                   </div>
-                )}
-              </div>
 
-              <div>
-                <label htmlFor="cust-name" style={{ fontSize: '0.78rem', color: '#4b5563', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
-                  Customer Name
-                </label>
-                <input
-                  id="cust-name"
-                  type="text"
-                  placeholder="Walk-in Customer"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  style={{ background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
-                />
-              </div>
+                  {showCustomerDropdown && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0,
+                      background: '#ffffff', border: '1px solid #cbd5e1',
+                      borderRadius: '8px', boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
+                      zIndex: 50, marginTop: '4px', maxHeight: '220px', overflowY: 'auto'
+                    }}>
+                      {/* Suggestion list */}
+                      {filteredCustomers.length > 0 ? (
+                        filteredCustomers.map((cust, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onMouseDown={() => {
+                              setCustomerPhone(cust.phone);
+                              setCustomerName(cust.name);
+                              setCustomerAddress(cust.address || '');
+                              setCustomerSearchQuery('');
+                              setShowCustomerDropdown(false);
+                            }}
+                            style={{
+                              width: '100%', padding: '10px 12px', border: 'none',
+                              background: 'none', textAlign: 'left', cursor: 'pointer',
+                              fontSize: '0.8rem', display: 'flex', flexDirection: 'column',
+                              borderBottom: '1px solid #f1f5f9', gap: '2px'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                          >
+                            <span style={{ fontWeight: 600, color: '#1e293b' }}>{cust.name}</span>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontFamily: 'monospace' }}>{cust.phone}</span>
+                            {cust.address && (
+                              <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <MapPin size={10} /> {cust.address}
+                              </span>
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '12px', textAlign: 'center', fontSize: '0.78rem', color: '#64748b' }}>
+                          No matching customers found
+                        </div>
+                      )}
+                      
+                      {/* Sticky Add Customer Button inside dropdown */}
+                      <button
+                        type="button"
+                        onMouseDown={handleOpenAddCustomerModal}
+                        style={{
+                          width: '100%', padding: '10px 12px', border: 'none',
+                          background: '#f0fdf4', color: '#15803d', textAlign: 'left',
+                          cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600,
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          borderTop: '1px solid #dcfce7', position: 'sticky', bottom: 0
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#dcfce7'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#f0fdf4'}
+                      >
+                        <UserPlus size={14} /> + Add New Customer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Bill Summary block */}
@@ -1397,33 +1564,27 @@ function POS({ token, business, printerCharacteristic }) {
       {/* MODAL: ADD NEW CUSTOMER */}
       {showAddCustomerModal && (
         <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div className="modal-content" style={{ background: '#ffffff', color: '#1f2937', maxWidth: '400px', borderRadius: '16px', padding: '24px' }}>
+          <form onSubmit={handleSaveNewCustomer} className="modal-content" style={{ background: '#ffffff', color: '#1f2937', maxWidth: '400px', borderRadius: '16px', padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <UserPlus size={18} style={{ color: '#2563eb' }} /> Add New Customer
               </h3>
-              <button type="button" onClick={() => setShowAddCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}>
+              <button type="button" onClick={() => setShowAddCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }} disabled={customerModalSaving}>
                 <X size={20} />
               </button>
             </div>
 
+            {customerModalError && (
+              <div className="alert-banner error mb-4" style={{ marginTop: '4px', marginBottom: '12px' }}>
+                <AlertTriangle size={16} />
+                <span>{customerModalError}</span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ fontSize: '0.78rem', color: '#4b5563', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
-                  Mobile Number
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 9876543210"
-                  value={newCustomerPhone}
-                  onChange={(e) => setNewCustomerPhone(e.target.value)}
-                  style={{ background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.78rem', color: '#4b5563', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
-                  Customer Name
+                  Customer Name *
                 </label>
                 <input
                   type="text"
@@ -1431,39 +1592,55 @@ function POS({ token, business, printerCharacteristic }) {
                   value={newCustomerName}
                   onChange={(e) => setNewCustomerName(e.target.value)}
                   autoFocus
-                  style={{ background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' }}
+                  style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box', height: '40px', padding: '8px 12px', borderRadius: '8px' }}
+                  required
+                  disabled={customerModalSaving}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.78rem', color: '#4b5563', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
+                  Mobile Number *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 9876543210"
+                  value={newCustomerPhone}
+                  onChange={(e) => setNewCustomerPhone(e.target.value)}
+                  style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box', height: '40px', padding: '8px 12px', borderRadius: '8px' }}
+                  required
+                  disabled={customerModalSaving}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.78rem', color: '#4b5563', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
+                  Address
+                </label>
+                <textarea
+                  placeholder="e.g. Plot 42, Hitech City, Hyderabad"
+                  value={newCustomerAddress}
+                  onChange={(e) => setNewCustomerAddress(e.target.value)}
+                  style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box', minHeight: '80px', padding: '8px 12px', borderRadius: '8px', fontFamily: 'inherit' }}
+                  disabled={customerModalSaving}
                 />
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-              <button type="button" onClick={() => setShowAddCustomerModal(false)} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.82rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
+              <button type="button" onClick={() => setShowAddCustomerModal(false)} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '0.82rem', border: '1px solid #cbd5e1', color: '#4b5563', background: '#ffffff', borderRadius: '8px', cursor: 'pointer' }} disabled={customerModalSaving}>
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={() => {
-                  if (!newCustomerPhone.trim()) {
-                    alert('Mobile number is required');
-                    return;
-                  }
-                  if (!newCustomerName.trim()) {
-                    alert('Customer name is required');
-                    return;
-                  }
-                  // Save customer
-                  setLocalCustomers([...localCustomers, { phone: newCustomerPhone.trim(), name: newCustomerName.trim() }]);
-                  setCustomerPhone(newCustomerPhone.trim());
-                  setCustomerName(newCustomerName.trim());
-                  setShowAddCustomerModal(false);
-                }}
+                type="submit"
                 className="btn-blue-primary"
-                style={{ width: 'auto', padding: '8px 20px', fontSize: '0.82rem', fontWeight: 600 }}
+                style={{ width: 'auto', padding: '8px 20px', fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
+                disabled={customerModalSaving}
               >
-                Save Customer
+                {customerModalSaving ? <><Loader2 className="animate-spin" size={14} /> Saving...</> : 'Save Customer'}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 

@@ -29,22 +29,8 @@ const API_URL = import.meta.env.VITE_API_URL;
 // ─── Module Configurations ────────────────────────────────────────────────────
 // Each coming-soon module declares its icon, color, desc, and planned features.
 const MODULE_CONFIG = {
-  customers: {
-    title: 'Customers',
-    desc: 'Manage your customer database, track purchase history, and build lasting relationships with your buyers.',
-    icon: <Users />,
-    colorClass: 'purple',
-    features: [
-      { icon: <UserPlus />, label: 'Customer Profiles', desc: 'Create and manage detailed customer records with contact info' },
-      { icon: <Phone />, label: 'Contact Management', desc: 'Store phone numbers, emails and addresses for quick access' },
-      { icon: <BarChart2 />, label: 'Purchase History', desc: 'View all past transactions linked to each customer' },
-      { icon: <Tag />, label: 'Customer Tags', desc: 'Label and group customers for targeted promotions' },
-      { icon: <TrendingUp />, label: 'Loyalty Tracking', desc: 'Track visits and spending to reward loyal customers' },
-      { icon: <FileText />, label: 'Outstanding Dues', desc: 'Monitor pending payments and credit balances' },
-    ]
-  },
-  suppliers: {
-    title: 'Suppliers',
+  vendors: {
+    title: 'Vendors',
     desc: 'Manage vendor relationships, track purchase orders, and streamline your procurement process.',
     icon: <Truck />,
     colorClass: 'yellow',
@@ -57,18 +43,18 @@ const MODULE_CONFIG = {
       { icon: <Star />, label: 'Supplier Ratings', desc: 'Rate and review vendor performance over time' },
     ]
   },
-  purchase: {
-    title: 'Purchase',
-    desc: 'Create purchase orders, track deliveries, and manage all inbound stock with ease.',
-    icon: <ShoppingBag />,
-    colorClass: 'teal',
+  staff: {
+    title: 'Staff',
+    desc: 'Control who has access to your business terminal and what permissions they hold.',
+    icon: <ShieldAlert />,
+    colorClass: 'pink',
     features: [
-      { icon: <FileText />, label: 'Purchase Orders', desc: 'Generate POs and send them directly to suppliers' },
-      { icon: <Package />, label: 'Goods Received Note', desc: 'Record received stock and reconcile with POs' },
-      { icon: <CreditCard />, label: 'Payment Tracking', desc: 'Log payments made to suppliers and track dues' },
-      { icon: <AlertTriangle />, label: 'Reorder Alerts', desc: 'Auto-alerts when stock falls below reorder level' },
-      { icon: <BarChart2 />, label: 'Purchase Reports', desc: 'Analyse procurement costs by category and period' },
-      { icon: <Archive />, label: 'Purchase History', desc: 'Full log of all purchases linked to your business' },
+      { icon: <UserPlus />, label: 'Add Team Members', desc: 'Invite cashiers, managers, and accountants' },
+      { icon: <Shield />, label: 'Role Management', desc: 'Assign Admin, Manager, or Cashier roles' },
+      { icon: <Key />, label: 'Permissions Control', desc: 'Granular access control per module and action' },
+      { icon: <Activity />, label: 'Activity Log', desc: 'Track all actions taken by each user' },
+      { icon: <Settings2 />, label: 'Session Control', desc: 'Force logout and manage active sessions' },
+      { icon: <Phone />, label: 'OTP Login', desc: 'All users log in securely via SMS OTP' },
     ]
   },
   expenses: {
@@ -85,36 +71,8 @@ const MODULE_CONFIG = {
       { icon: <FileText />, label: 'Export Reports', desc: 'Download expense sheets for accounting purposes' },
     ]
   },
-  returns: {
-    title: 'Returns',
-    desc: 'Handle product returns, process refunds, and manage exchange requests efficiently.',
-    icon: <RotateCcw />,
-    colorClass: 'purple',
-    features: [
-      { icon: <RotateCw />, label: 'Return Requests', desc: 'Log customer return requests with reason and date' },
-      { icon: <CheckCircle />, label: 'Approval Workflow', desc: 'Review and approve or reject return requests' },
-      { icon: <CreditCard />, label: 'Refund Processing', desc: 'Issue refunds via original payment method' },
-      { icon: <Package />, label: 'Stock Restoration', desc: 'Automatically restore inventory on approved returns' },
-      { icon: <BarChart2 />, label: 'Returns Analysis', desc: 'Track return rates by product and time period' },
-      { icon: <FileText />, label: 'Return Receipts', desc: 'Generate return confirmation receipts for customers' },
-    ]
-  },
-  reports: {
-    title: 'Reports & Analytics',
-    desc: 'Gain deep insights into your business performance with powerful reports and visualisations.',
-    icon: <BarChart3 />,
-    colorClass: 'blue',
-    features: [
-      { icon: <TrendingUp />, label: 'Sales Reports', desc: 'Daily, weekly, and monthly revenue breakdowns' },
-      { icon: <PieChartIcon />, label: 'Category Analysis', desc: 'Identify best-selling categories and items' },
-      { icon: <LineChart />, label: 'Trend Graphs', desc: 'Interactive charts for sales, stock, and expenses' },
-      { icon: <Users />, label: 'Customer Analytics', desc: 'Top customers, frequency and spending reports' },
-      { icon: <Package />, label: 'Stock Reports', desc: 'Low-stock, dead-stock and reorder analysis' },
-      { icon: <Download />, label: 'Export to Excel', desc: 'Download any report as Excel or PDF' },
-    ]
-  },
   stock: {
-    title: 'Stock Summary',
+    title: 'Stock Analysis',
     desc: 'Get a real-time snapshot of your entire inventory, low-stock alerts, and stock valuation.',
     icon: <PieChart />,
     colorClass: 'green',
@@ -126,84 +84,12 @@ const MODULE_CONFIG = {
       { icon: <Filter />, label: 'Smart Filters', desc: 'Filter by category, price range, or stock status' },
       { icon: <SortAsc />, label: 'Sort & Export', desc: 'Sort by quantity, value, or name and export' },
     ]
-  },
-  users: {
-    title: 'User Management',
-    desc: 'Control who has access to your business terminal and what permissions they hold.',
-    icon: <ShieldAlert />,
-    colorClass: 'pink',
-    features: [
-      { icon: <UserPlus />, label: 'Add Team Members', desc: 'Invite cashiers, managers, and accountants' },
-      { icon: <Shield />, label: 'Role Management', desc: 'Assign Admin, Manager, or Cashier roles' },
-      { icon: <Key />, label: 'Permissions Control', desc: 'Granular access control per module and action' },
-      { icon: <Activity />, label: 'Activity Log', desc: 'Track all actions taken by each user' },
-      { icon: <Settings2 />, label: 'Session Control', desc: 'Force logout and manage active sessions' },
-      { icon: <Phone />, label: 'OTP Login', desc: 'All users log in securely via SMS OTP' },
-    ]
-  },
-  backup: {
-    title: 'Backup & Restore',
-    desc: 'Keep your business data safe with automatic cloud backups and one-click restore.',
-    icon: <CloudLightning />,
-    colorClass: 'yellow',
-    features: [
-      { icon: <Upload />, label: 'Auto Cloud Backup', desc: 'Daily automatic backups to secure cloud storage' },
-      { icon: <Download />, label: 'One-click Restore', desc: 'Restore your data to any previous backup point' },
-      { icon: <HardDrive />, label: 'Local Export', desc: 'Download full data export as JSON or Excel' },
-      { icon: <Database />, label: 'Data Encryption', desc: 'All backups are AES-256 encrypted at rest' },
-      { icon: <Clock />, label: 'Backup History', desc: 'View and restore from the last 30 backup snapshots' },
-      { icon: <CheckCircle />, label: 'Integrity Checks', desc: 'Automated verification of every backup created' },
-    ]
-  },
-  tax: {
-    title: 'Tax Management',
-    desc: 'Configure GST slabs, manage tax categories, and generate GST-compliant reports.',
-    icon: <Calculator />,
-    colorClass: 'teal',
-    features: [
-      { icon: <PercentIcon />, label: 'GST Slabs', desc: 'Configure 0%, 5%, 12%, 18%, 28% GST rates' },
-      { icon: <Tag />, label: 'Product Tax Mapping', desc: 'Link each product to its correct tax category' },
-      { icon: <FileText />, label: 'GST Reports', desc: 'Generate GSTR-1 and GSTR-3B compatible reports' },
-      { icon: <Receipt />, label: 'Tax on Invoices', desc: 'Auto-apply and display GST on every bill' },
-      { icon: <TrendingUp />, label: 'Tax Liability Summary', desc: 'Monthly tax collected and input credit view' },
-      { icon: <Download />, label: 'Export for CA', desc: 'Download tax data ready for your accountant' },
-    ]
-  },
-  offers: {
-    title: 'Offers & Discounts',
-    desc: 'Create promotional campaigns, manage discount codes, and reward your loyal customers.',
-    icon: <Gift />,
-    colorClass: 'purple',
-    features: [
-      { icon: <Ticket />, label: 'Discount Codes', desc: 'Create coupon codes with flat or percentage discounts' },
-      { icon: <PercentIcon />, label: 'Product Offers', desc: 'Apply discounts to specific products or categories' },
-      { icon: <Star />, label: 'Loyalty Points', desc: 'Reward repeat customers with redeemable points' },
-      { icon: <Calendar />, label: 'Scheduled Offers', desc: 'Set start and end dates for time-limited deals' },
-      { icon: <Users />, label: 'Targeted Campaigns', desc: 'Send offers to specific customer segments' },
-      { icon: <BarChart2 />, label: 'Offer Analytics', desc: 'Track redemption rates and revenue impact' },
-    ]
-  },
-  help: {
-    title: 'Help & Support',
-    desc: 'Access user guides, video tutorials, and get in touch with our support team.',
-    icon: <HelpCircle />,
-    colorClass: 'green',
-    features: [
-      { icon: <BookOpen />, label: 'User Guide', desc: 'Step-by-step documentation for every feature' },
-      { icon: <Video />, label: 'Video Tutorials', desc: 'Watch walkthroughs of billing, inventory, and reports' },
-      { icon: <MessageCircle />, label: 'Live Chat', desc: 'Chat with our support agents in real-time' },
-      { icon: <Headphones />, label: 'Phone Support', desc: 'Call our dedicated business support helpline' },
-      { icon: <FileText />, label: 'FAQs', desc: 'Answers to the most common questions' },
-      { icon: <CheckCircle />, label: 'System Status', desc: 'Live uptime and maintenance information' },
-    ]
-  },
+  }
 };
 
 // ─── All valid page tab names ─────────────────────────────────────────────────
 const ALL_TABS = [
-  'home','pos','products','invoices','settings',
-  'customers','suppliers','purchase','expenses','returns',
-  'reports','stock','users','backup','tax','offers','help'
+  'home', 'pos', 'products', 'customers', 'vendors', 'staff', 'expenses', 'stock', 'settings'
 ];
 
 // ─── Dashboard Component ──────────────────────────────────────────────────────
@@ -333,24 +219,16 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
     hour: '2-digit', minute: '2-digit', hour12: true
   });
 
-  // ── 16 Home Grid Cards ───────────────────────────────────────────────────────
+  // ── Home Grid Cards ───────────────────────────────────────────────────────
   const cards = [
-    { id: 'pos',       title: 'POS / Billing',      desc: 'Create invoices and process sales quickly',          icon: <Calculator />,  colorClass: 'blue'   },
+    { id: 'pos',       title: 'Billing',             desc: 'Create invoices and process sales quickly',          icon: <Calculator />,  colorClass: 'blue'   },
     { id: 'products',  title: 'Products',            desc: 'Manage product stock, categories and prices',       icon: <Package />,     colorClass: 'green'  },
-    { id: 'customers', title: 'Customers',           desc: 'Add and manage customer information',               icon: <Users />,       colorClass: 'purple' },
-    { id: 'suppliers', title: 'Suppliers',           desc: 'Manage supplier details and transactions',          icon: <Truck />,       colorClass: 'yellow' },
-    { id: 'invoices',  title: 'Sales',               desc: 'View and manage all sales records',                 icon: <ShoppingCart />,colorClass: 'pink'   },
-    { id: 'purchase',  title: 'Purchase',            desc: 'Create purchase orders and track them',             icon: <ShoppingBag />, colorClass: 'teal'   },
+    { id: 'customers', title: 'Customer',            desc: 'Add and manage customer information',               icon: <Users />,       colorClass: 'purple' },
+    { id: 'vendors',   title: 'Vendors',             desc: 'Manage vendor details and transactions',            icon: <Truck />,       colorClass: 'yellow' },
+    { id: 'staff',     title: 'Staff',               desc: 'Manage users and set permissions',                 icon: <ShieldAlert />, colorClass: 'pink'   },
     { id: 'expenses',  title: 'Expenses',            desc: 'Add and manage business expenses',                  icon: <Wallet />,      colorClass: 'orange' },
-    { id: 'returns',   title: 'Returns',             desc: 'Manage product returns and refunds',                icon: <RotateCcw />,   colorClass: 'purple' },
-    { id: 'reports',   title: 'Reports',             desc: 'View business reports and analytics',              icon: <BarChart3 />,   colorClass: 'blue'   },
-    { id: 'stock',     title: 'Stock Summary',       desc: 'Check stock availability and low stock alerts',    icon: <PieChart />,    colorClass: 'green'  },
-    { id: 'users',     title: 'User Management',     desc: 'Manage users and set permissions',                 icon: <ShieldAlert />, colorClass: 'pink'   },
+    { id: 'stock',     title: 'Stock Analysis',      desc: 'Check stock availability and low stock alerts',    icon: <PieChart />,    colorClass: 'green'  },
     { id: 'settings',  title: 'Settings',            desc: 'Configure store settings and preferences',         icon: <SettingsIcon />,colorClass: 'blue'   },
-    { id: 'backup',    title: 'Backup',              desc: 'Backup and restore your data',                     icon: <CloudLightning />,colorClass: 'yellow'},
-    { id: 'tax',       title: 'Tax Management',      desc: 'Manage tax slabs and GST settings',               icon: <Calculator />,  colorClass: 'teal'   },
-    { id: 'offers',    title: 'Offers & Discounts',  desc: 'Create and manage offers and discounts',           icon: <Gift />,        colorClass: 'purple' },
-    { id: 'help',      title: 'Help & Support',      desc: 'Get help and view user guide',                    icon: <HelpCircle />,  colorClass: 'green'  },
   ];
 
   // ── Render Home Grid ─────────────────────────────────────────────────────────
@@ -418,7 +296,7 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
 
       // ── Fully implemented pages ──
       case 'pos':
-        return renderPageWithBreadcrumb('POS Billing', 
+        return renderPageWithBreadcrumb('Billing', 
           <POS 
             token={token} 
             business={business} 
@@ -426,17 +304,16 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
           />
         );
       case 'products':
-        return (
+        return renderPageWithBreadcrumb('Products',
           <Items 
             token={token} 
             business={business} 
             printerCharacteristic={printerCharacteristic} 
+            printerDevice={printerDevice}
           />
         );
-      case 'invoices':
-        return renderPageWithBreadcrumb('Sales History', <Invoices token={token} business={business} />);
       case 'customers':
-        return renderPageWithBreadcrumb('Customer Directory', <Customers token={token} business={business} />);
+        return renderPageWithBreadcrumb('Customer', <Customers token={token} business={business} />);
       case 'settings':
         return renderPageWithBreadcrumb('Settings',
           <Settings token={token} business={business} user={user} onSwitchBusiness={onSwitchBusiness} onLogout={onLogout} />

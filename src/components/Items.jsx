@@ -204,7 +204,7 @@ function CategoryDropdown({ categories, value, onChange }) {
 }
 
 // ─── Main Items Component ─────────────────────────────────────────────────────
-function Items({ token, business, printerCharacteristic }) {
+function Items({ token, business, printerCharacteristic, printerDevice }) {
   const [activeTab, setActiveTab] = useState('items'); // 'items' | 'categories'
 
   // ── shared headers ──
