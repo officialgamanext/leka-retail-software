@@ -13,7 +13,7 @@ import {
   Shield, Key, Activity, Settings2,
   Upload, Download, HardDrive, Database,
   Receipt, Percent as PercentIcon, Ticket, Star,
-  BookOpen, Video, MessageCircle, Headphones,
+  BookOpen, Video, MessageCircle, Headphones, Printer,
   Package2, Filter, SortAsc, Layers
 } from 'lucide-react';
 import axios from 'axios';
@@ -215,6 +215,67 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
   const adminMenuRef = useRef(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Bluetooth Printer states
+  const [printerDevice, setPrinterDevice] = useState(null);
+  const [printerCharacteristic, setPrinterCharacteristic] = useState(null);
+  const [printerConnecting, setPrinterConnecting] = useState(false);
+
+  const handleConnectPrinter = async () => {
+    if (printerDevice && printerDevice.gatt.connected) {
+      try {
+        await printerDevice.gatt.disconnect();
+      } catch (err) {
+        console.error(err);
+      }
+      setPrinterDevice(null);
+      setPrinterCharacteristic(null);
+      return;
+    }
+
+    setPrinterConnecting(true);
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [
+          '000018f0-0000-1000-8000-00805f9b34fb', // General Printer Service
+          '0000fff0-0000-1000-8000-00805f9b34fb', // Common thermal service
+          '0000e7e1-0000-1000-8000-00805f9b34fb'  // Another common service
+        ]
+      });
+
+      const server = await device.gatt.connect();
+      const services = await server.getPrimaryServices();
+      let characteristic = null;
+
+      for (const service of services) {
+        const characteristics = await service.getCharacteristics();
+        const writeChar = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
+        if (writeChar) {
+          characteristic = writeChar;
+          break;
+        }
+      }
+
+      if (!characteristic) {
+        throw new Error("Could not find a write characteristic on the printer.");
+      }
+
+      setPrinterDevice(device);
+      setPrinterCharacteristic(characteristic);
+      
+      device.addEventListener('gattserverdisconnected', () => {
+        setPrinterDevice(null);
+        setPrinterCharacteristic(null);
+      });
+      
+      alert(`Connected to ${device.name || 'Printer'} successfully!`);
+    } catch (err) {
+      alert(`Connection failed: ${err.message}`);
+    } finally {
+      setPrinterConnecting(false);
+    }
+  };
+
   // ── Live clock ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -356,9 +417,21 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
 
       // ── Fully implemented pages ──
       case 'pos':
-        return renderPageWithBreadcrumb('POS Billing', <POS token={token} business={business} />);
+        return renderPageWithBreadcrumb('POS Billing', 
+          <POS 
+            token={token} 
+            business={business} 
+            printerCharacteristic={printerCharacteristic} 
+          />
+        );
       case 'products':
-        return <Items token={token} business={business} />;
+        return (
+          <Items 
+            token={token} 
+            business={business} 
+            printerCharacteristic={printerCharacteristic} 
+          />
+        );
       case 'invoices':
         return renderPageWithBreadcrumb('Sales History', <Invoices token={token} business={business} />);
       case 'settings':
@@ -457,7 +530,35 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
         </div>
 
         {/* Right Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* Bluetooth Printer Connection */}
+          <button
+            type="button"
+            onClick={handleConnectPrinter}
+            disabled={printerConnecting}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: printerDevice ? '#ecfdf5' : '#eff6ff',
+              color: printerDevice ? '#059669' : '#2563eb',
+              border: printerDevice ? '1px solid #a7f3d0' : '1px solid #bfdbfe',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {printerConnecting ? (
+              <><Loader2 className="animate-spin" size={12} /> Connecting...</>
+            ) : printerDevice ? (
+              <><CheckCircle size={12} /> Printer Connected</>
+            ) : (
+              <><Printer size={12} /> Connect Printer</>
+            )}
+          </button>
           {/* Bell */}
           <div style={{ position: 'relative', cursor: 'pointer' }}>
             <Bell size={20} style={{ color: '#4b5563' }} />
