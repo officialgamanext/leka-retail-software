@@ -4,7 +4,7 @@ import {
   Search, ShoppingBag, Trash2, Tag, CreditCard, Banknote, 
   Landmark, Loader2, Sparkles, ReceiptText, Barcode, Eye, 
   Plus, Minus, CheckCircle, Printer, AlertTriangle, Play, X, Wallet, RefreshCw,
-  UserPlus, Camera, MapPin, ChevronDown
+  UserPlus, Camera, MapPin, ChevronDown, Package
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
@@ -138,6 +138,13 @@ function POS({ token, business, printerCharacteristic }) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('Cash');
   const [settleLoading, setSettleLoading] = useState(false);
 
+  // Offline Billing & Connection State
+  const [offlineBills, setOfflineBills] = useState(() => {
+    return JSON.parse(localStorage.getItem(`leka_offline_bills_${business.id}`) || '[]');
+  });
+  const [syncing, setSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
   // Customer directory & Scanner states
   const [localCustomers, setLocalCustomers] = useState([]);
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
@@ -158,34 +165,157 @@ function POS({ token, business, printerCharacteristic }) {
     'X-Business-Id': business.id
   }), [token, business.id]);
 
-  // Fetch Master Data
+  // Sync manager for offline bills
+  const syncOfflineBills = async () => {
+    if (syncing) return;
+    const cacheKey = `leka_offline_bills_${business.id}`;
+    const pending = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+    if (pending.length === 0) return;
+
+    setSyncing(true);
+    const headersConfig = headers();
+    let successCount = 0;
+    const remaining = [];
+
+    for (const bill of pending) {
+      try {
+        let response;
+        if (bill.status === 'Settled' || bill.status === 'Open') {
+          response = await axios.post(`${API_URL}/invoices`, {
+            customerName: bill.customerName,
+            customerPhone: bill.customerPhone,
+            items: bill.items.map(it => ({
+              productId: it.productId,
+              quantity: it.quantity
+            })),
+            discount: bill.discount,
+            paymentMethod: bill.paymentMethod,
+            status: bill.status,
+            createdAt: bill.createdAt
+          }, { headers: headersConfig });
+        }
+        
+        if (response && response.data.success) {
+          successCount++;
+        } else {
+          remaining.push(bill);
+        }
+      } catch (err) {
+        console.error('Failed to sync offline bill:', err);
+        remaining.push(bill);
+      }
+    }
+
+    localStorage.setItem(cacheKey, JSON.stringify(remaining));
+    setOfflineBills(remaining);
+    setSyncing(false);
+
+    if (successCount > 0) {
+      // Revalidate master caches
+      try {
+        const responseHistory = await axios.get(`${API_URL}/invoices`, { headers: headersConfig });
+        if (responseHistory.data.success) {
+          setHistory(responseHistory.data.invoices);
+          localStorage.setItem(`leka_cache_history_${business.id}`, JSON.stringify(responseHistory.data.invoices));
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      try {
+        const responseProducts = await axios.get(`${API_URL}/products`, { headers: headersConfig });
+        if (responseProducts.data.success) {
+          setProducts(responseProducts.data.products);
+          localStorage.setItem(`leka_cache_products_${business.id}`, JSON.stringify(responseProducts.data.products));
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  // Sync Listeners
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncOfflineBills();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (navigator.onLine && offlineBills.length > 0) {
+        syncOfflineBills();
+      }
+    }, 20000); // sync check interval 20s
+    return () => clearInterval(interval);
+  }, [offlineBills]);
+
+  // Fetch Master Data & Trigger Sync
   useEffect(() => {
     fetchProducts();
     fetchCategories();
     fetchHistory();
     fetchCustomerDirectory();
+    if (navigator.onLine) {
+      syncOfflineBills();
+    }
   }, [business.id]);
 
   const fetchProducts = async () => {
-    setLoading(true);
+    const cacheKey = `leka_cache_products_${business.id}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setProducts(JSON.parse(cached));
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      setLoading(true);
+    }
     setError('');
+
     try {
       const response = await axios.get(`${API_URL}/products`, { headers: headers() });
       if (response.data.success) {
         setProducts(response.data.products);
+        localStorage.setItem(cacheKey, JSON.stringify(response.data.products));
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load product list');
+      if (!cached) {
+        setError(err.response?.data?.message || 'Failed to load product list');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const fetchCategories = async () => {
+    const cacheKey = `leka_cache_categories_${business.id}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setCategories(JSON.parse(cached));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     try {
       const response = await axios.get(`${API_URL}/categories`, { headers: headers() });
       if (response.data.success) {
         setCategories(response.data.categories);
+        localStorage.setItem(cacheKey, JSON.stringify(response.data.categories));
       }
     } catch (err) {
       console.error('Failed to load categories', err);
@@ -193,11 +323,23 @@ function POS({ token, business, printerCharacteristic }) {
   };
 
   const fetchHistory = async () => {
-    setHistoryLoading(true);
+    const cacheKey = `leka_cache_history_${business.id}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setHistory(JSON.parse(cached));
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      setHistoryLoading(true);
+    }
+
     try {
       const response = await axios.get(`${API_URL}/invoices`, { headers: headers() });
       if (response.data.success) {
         setHistory(response.data.invoices);
+        localStorage.setItem(cacheKey, JSON.stringify(response.data.invoices));
       }
     } catch (err) {
       console.error('Failed to load invoice history', err);
@@ -207,10 +349,21 @@ function POS({ token, business, printerCharacteristic }) {
   };
 
   const fetchCustomerDirectory = async () => {
+    const cacheKey = `leka_cache_customers_${business.id}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setCustomerDirectory(JSON.parse(cached));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
     try {
       const response = await axios.get(`${API_URL}/customers`, { headers: headers() });
       if (response.data.success) {
         setCustomerDirectory(response.data.customers);
+        localStorage.setItem(cacheKey, JSON.stringify(response.data.customers));
       }
     } catch (err) {
       console.error('Failed to load customer directory', err);
@@ -611,37 +764,67 @@ function POS({ token, business, printerCharacteristic }) {
 
   // Save Bill (Open / Unsettled)
   const handleSaveBill = async () => {
+    if (!customerName.trim() || !customerPhone.trim()) {
+      alert('Customer is mandatory. Please search for an existing customer or add a new customer first.');
+      return;
+    }
+
     if (cart.length === 0) {
       alert('Cart is empty. Add products before saving.');
       return;
     }
 
-    try {
-      const response = await axios.post(`${API_URL}/invoices`, {
-        customerName,
-        customerPhone,
-        items: cart.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity
-        })),
-        discount: Number(discount),
-        paymentMethod: 'Pending',
-        status: 'Open'
-      }, { headers: headers() });
+    const offlineBillId = `offline_${Date.now()}`;
+    const offlineBillNo = `OFF-OPEN-${Date.now().toString().slice(-6)}`;
+    const subtotalLocal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const gstRateLocal = business.gstEnabled ? Number(business.gstPercentage || 0) : 0;
+    const taxAmountLocal = (subtotalLocal * gstRateLocal) / 100;
+    const grandTotalLocal = Math.max(0, subtotalLocal + taxAmountLocal - Number(discount));
 
-      if (response.data.success) {
-        alert(`Bill ${response.data.invoice.invoiceNumber} saved as Open successfully!`);
-        handleClearCart();
-        fetchHistory();
-        fetchProducts(); // refresh stock levels
-      }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to save bill');
+    const offlineInvoiceObj = {
+      id: offlineBillId,
+      isOffline: true,
+      invoiceNumber: offlineBillNo,
+      customerName: customerName || 'Walk-in Customer',
+      customerPhone: customerPhone || '',
+      items: cart.map(item => ({
+        productId: item.productId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        total: item.price * item.quantity,
+        gstRate: gstRateLocal
+      })),
+      discount: Number(discount),
+      subtotal: subtotalLocal,
+      taxAmount: taxAmountLocal,
+      grandTotal: grandTotalLocal,
+      paymentMethod: 'Pending',
+      status: 'Open',
+      createdAt: new Date().toISOString()
+    };
+
+    const cacheKey = `leka_offline_bills_${business.id}`;
+    const pending = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+    const updatedPending = [...pending, offlineInvoiceObj];
+    localStorage.setItem(cacheKey, JSON.stringify(updatedPending));
+    setOfflineBills(updatedPending);
+
+    alert(`Bill ${offlineBillNo} saved locally as Open! It will sync automatically.`);
+    handleClearCart();
+
+    if (navigator.onLine) {
+      syncOfflineBills();
     }
   };
 
   // Open Settlement Modal
   const handleOpenSettlement = () => {
+    if (!customerName.trim() || !customerPhone.trim()) {
+      alert('Customer is mandatory. Please search for an existing customer or add a new customer first.');
+      return;
+    }
+
     if (cart.length === 0) {
       alert('Cart is empty. Select products to settle.');
       return;
@@ -663,30 +846,66 @@ function POS({ token, business, printerCharacteristic }) {
     if (!settlementBill) return;
 
     setSettleLoading(true);
-    try {
-      if (settlementBill.isNew) {
-        // Settle a new bill
-        const response = await axios.post(`${API_URL}/invoices`, {
-          customerName: settlementBill.customerName,
-          customerPhone: settlementBill.customerPhone,
-          items: cart.map(item => ({
-            productId: item.productId,
-            quantity: item.quantity
-          })),
-          discount: settlementBill.discount,
-          paymentMethod: selectedPaymentMethod,
-          status: 'Settled'
-        }, { headers: headers() });
 
-        if (response.data.success) {
-          setCheckoutInvoice(response.data.invoice);
-          handleClearCart();
-          setSettlementBill(null);
-          fetchHistory();
-          fetchProducts();
+    if (settlementBill.isNew) {
+      const offlineBillId = `offline_${Date.now()}`;
+      const offlineBillNo = `OFF-SETTLED-${Date.now().toString().slice(-6)}`;
+      const subtotalLocal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const gstRateLocal = business.gstEnabled ? Number(business.gstPercentage || 0) : 0;
+      const taxAmountLocal = (subtotalLocal * gstRateLocal) / 100;
+      const grandTotalLocal = Math.max(0, subtotalLocal + taxAmountLocal - Number(settlementBill.discount));
+
+      const offlineInvoiceObj = {
+        id: offlineBillId,
+        isOffline: true,
+        invoiceNumber: offlineBillNo,
+        customerName: settlementBill.customerName || 'Walk-in Customer',
+        customerPhone: settlementBill.customerPhone || '',
+        items: cart.map(item => ({
+          productId: item.productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          total: item.price * item.quantity,
+          gstRate: gstRateLocal
+        })),
+        discount: Number(settlementBill.discount),
+        subtotal: subtotalLocal,
+        taxAmount: taxAmountLocal,
+        grandTotal: grandTotalLocal,
+        paymentMethod: selectedPaymentMethod,
+        status: 'Settled',
+        createdAt: new Date().toISOString()
+      };
+
+      const cacheKey = `leka_offline_bills_${business.id}`;
+      const pending = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+      const updatedPending = [...pending, offlineInvoiceObj];
+      localStorage.setItem(cacheKey, JSON.stringify(updatedPending));
+      setOfflineBills(updatedPending);
+
+      // Deduct stock levels locally
+      const updatedProducts = products.map(p => {
+        const cartItem = cart.find(it => it.productId === p.id);
+        if (cartItem) {
+          return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
         }
-      } else {
-        // Settle an existing open bill
+        return p;
+      });
+      setProducts(updatedProducts);
+      localStorage.setItem(`leka_cache_products_${business.id}`, JSON.stringify(updatedProducts));
+
+      setCheckoutInvoice(offlineInvoiceObj);
+      handleClearCart();
+      setSettlementBill(null);
+      setSettleLoading(false);
+
+      if (navigator.onLine) {
+        syncOfflineBills();
+      }
+    } else {
+      // Settle an existing open bill online
+      try {
         const response = await axios.put(`${API_URL}/invoices/${settlementBill.id}/settle`, {
           paymentMethod: selectedPaymentMethod
         }, { headers: headers() });
@@ -696,11 +915,11 @@ function POS({ token, business, printerCharacteristic }) {
           setSettlementBill(null);
           fetchHistory();
         }
+      } catch (err) {
+        alert(err.response?.data?.message || 'Settlement failed. Network is offline.');
+      } finally {
+        setSettleLoading(false);
       }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Settlement failed');
-    } finally {
-      setSettleLoading(false);
     }
   };
 
@@ -724,6 +943,63 @@ function POS({ token, business, printerCharacteristic }) {
   return (
     <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '20px', minHeight: 'calc(100vh - 70px)', background: '#f8fafc' }}>
       
+      {/* Offline Sync Indicator Bar */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '10px 18px',
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '10px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.01)',
+        fontSize: '0.8rem',
+        fontWeight: 600,
+        color: '#374151'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: isOnline ? '#10b981' : '#ef4444',
+            display: 'inline-block'
+          }}></span>
+          <span>Terminal Connection: {isOnline ? 'Online' : 'Offline Mode (Local Caching)'}</span>
+        </div>
+
+        {offlineBills.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#d97706' }}>
+            <span>⚠️ {offlineBills.length} Bill{offlineBills.length > 1 ? 's' : ''} Pending Sync</span>
+            <button
+              onClick={syncOfflineBills}
+              disabled={syncing}
+              style={{
+                background: '#f59e0b',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                height: '28px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {syncing ? (
+                <><Loader2 className="animate-spin" size={10} /> Syncing...</>
+              ) : (
+                'Sync Now'
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Tab Header & Switcher */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', paddingBottom: '16px' }}>
         <div>
@@ -932,10 +1208,12 @@ function POS({ token, business, printerCharacteristic }) {
                       return (
                         <div 
                           key={p.id}
+                          onClick={() => !isOutOfStock && handleAddToCart(p)}
                           style={{
                             background: '#ffffff', border: isAdded ? '2px solid #2563eb' : '1px solid #e5e7eb',
                             borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px',
-                            transition: 'all 0.2s ease', position: 'relative', opacity: isOutOfStock ? 0.6 : 1
+                            transition: 'all 0.2s ease', position: 'relative', opacity: isOutOfStock ? 0.6 : 1,
+                            cursor: isOutOfStock ? 'not-allowed' : 'pointer'
                           }}
                         >
                           {/* Image Placeholder */}
@@ -969,18 +1247,18 @@ function POS({ token, business, printerCharacteristic }) {
                               </button>
                             ) : isAdded ? (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '4px' }}>
-                                <button type="button" onClick={() => handleUpdateQty(p.id, cartItem.quantity - 1)} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                                <button type="button" onClick={(e) => { e.stopPropagation(); handleUpdateQty(p.id, cartItem.quantity - 1); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px', display: 'flex' }}>
                                   <Minus size={12} />
                                 </button>
                                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#2563eb' }}>{cartItem.quantity} selected</span>
-                                <button type="button" onClick={() => handleUpdateQty(p.id, cartItem.quantity + 1)} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                                <button type="button" onClick={(e) => { e.stopPropagation(); handleUpdateQty(p.id, cartItem.quantity + 1); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px', display: 'flex' }}>
                                   <Plus size={12} />
                                 </button>
                               </div>
                             ) : (
                               <button 
                                 type="button" 
-                                onClick={() => handleAddToCart(p)}
+                                onClick={(e) => { e.stopPropagation(); handleAddToCart(p); }}
                                 style={{ width: '100%', background: '#2563eb', border: 'none', color: '#ffffff', padding: '6px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                               >
                                 <Plus size={11} /> Select Item
@@ -1202,7 +1480,7 @@ function POS({ token, business, printerCharacteristic }) {
                 /* Unified Customer Search Input & suggestions dropdown */
                 <div style={{ position: 'relative' }}>
                   <label htmlFor="cust-search" style={{ fontSize: '0.78rem', color: '#4b5563', fontWeight: 500, display: 'block', marginBottom: '6px' }}>
-                    Search Customer
+                    Search Customer <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <div style={{ position: 'relative' }}>
                     <Search size={14} style={{ position: 'absolute', left: '10px', top: '12px', color: '#9ca3af' }} />
@@ -1226,6 +1504,9 @@ function POS({ token, business, printerCharacteristic }) {
                         height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1'
                       }}
                     />
+                  </div>
+                  <div style={{ marginTop: '6px', color: '#ef4444', fontSize: '0.72rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>⚠️ Customer is required before checking out</span>
                   </div>
 
                   {showCustomerDropdown && (
