@@ -247,7 +247,7 @@ function Items({ token, business, printerCharacteristic, printerDevice }) {
   const [itemName,        setItemName]       = useState('');
   const [itemShortCode,   setItemShortCode]  = useState('');
   const [itemPrice,       setItemPrice]      = useState('');
-  const [itemGst,         setItemGst]        = useState(18);
+  const [itemGst,         setItemGst]        = useState(0);
   const [itemStock,       setItemStock]      = useState('');
   const [itemBufferStock, setItemBufferStock]= useState('');
   const [itemCategoryId,  setItemCategoryId] = useState('');
@@ -318,7 +318,7 @@ function Items({ token, business, printerCharacteristic, printerDevice }) {
   // ────────────────────────────────────────────────────────────────────────────
   const resetItemForm = () => {
     setItemName(''); setItemShortCode(''); setItemPrice('');
-    setItemGst(18); setItemStock(0); setItemBufferStock('');
+    setItemGst(0); setItemStock(0); setItemBufferStock('');
     setItemCategoryId(''); setItemCategoryName('All Categories');
     setItemImageFile(null); setItemImagePreview('');
     setBarcodeValue(''); setBarcodePreview('');
@@ -1289,37 +1289,20 @@ function Items({ token, business, printerCharacteristic, printerDevice }) {
                   />
                 </div>
 
-                {/* ── Price + GST row ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4b5563', display: 'block', marginBottom: '6px' }}>
-                      Price (₹) *
-                    </label>
-                    <input
-                      type="number" step="0.01" min="0" placeholder="0.00"
-                      value={itemPrice} onChange={e => setItemPrice(e.target.value)}
-                      disabled={itemSaving} required
-                      style={{
-                        width: '100%', background: '#f9fafb', border: '1px solid #d1d5db',
-                        borderRadius: '8px', padding: '10px 12px', fontSize: '0.88rem', color: '#1f2937'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4b5563', display: 'block', marginBottom: '6px' }}>
-                      GST Rate
-                    </label>
-                    <select
-                      value={itemGst} onChange={e => setItemGst(Number(e.target.value))}
-                      disabled={itemSaving}
-                      style={{
-                        width: '100%', background: '#f9fafb', border: '1px solid #d1d5db',
-                        borderRadius: '8px', padding: '10px 12px', fontSize: '0.88rem', color: '#1f2937'
-                      }}
-                    >
-                      {[0,5,12,18,28].map(r => <option key={r} value={r}>{r}% GST</option>)}
-                    </select>
-                  </div>
+                {/* ── Price row (GST is globally configured in settings) ── */}
+                <div>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4b5563', display: 'block', marginBottom: '6px' }}>
+                    Price (₹) *
+                  </label>
+                  <input
+                    type="number" step="0.01" min="0" placeholder="0.00"
+                    value={itemPrice} onChange={e => setItemPrice(e.target.value)}
+                    disabled={itemSaving} required
+                    style={{
+                      width: '100%', background: '#f9fafb', border: '1px solid #d1d5db',
+                      borderRadius: '8px', padding: '10px 12px', fontSize: '0.88rem', color: '#1f2937'
+                    }}
+                  />
                 </div>
 
                 {/* ── Initial Stock + Buffer Stock row ── */}

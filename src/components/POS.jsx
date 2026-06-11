@@ -4,11 +4,103 @@ import {
   Search, ShoppingBag, Trash2, Tag, CreditCard, Banknote, 
   Landmark, Loader2, Sparkles, ReceiptText, Barcode, Eye, 
   Plus, Minus, CheckCircle, Printer, AlertTriangle, Play, X, Wallet, RefreshCw,
-  UserPlus, Camera, MapPin
+  UserPlus, Camera, MapPin, ChevronDown
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 const API_URL = import.meta.env.VITE_API_URL;
+
+// ─── Custom Category Dropdown for POS ─────────────────────────────────────────
+function CategoryDropdown({ categories, value, onChange }) {
+  const [open, setOpen]     = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handler(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const allOptions  = [{ id: '', name: 'All Categories' }, ...categories];
+  const filtered    = allOptions.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase())
+  );
+  const selected    = allOptions.find(c => c.id === value) || allOptions[0];
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: '180px', flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px',
+          padding: '8px 14px', fontSize: '0.85rem', color: '#1f2937', cursor: 'pointer',
+          height: '38px', boxSizing: 'border-box'
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.name}</span>
+        <ChevronDown size={14} style={{ color: '#9ca3af', transform: open ? 'rotate(180deg)' : 'none', transition: '0.2s', flexShrink: 0 }} />
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', right: 0, zIndex: 200, width: '220px',
+          background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.1)', marginTop: '4px', overflow: 'hidden'
+        }}>
+          {/* Search within dropdown */}
+          <div style={{ padding: '8px', borderBottom: '1px solid #f3f4f6' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={12} style={{ position: 'absolute', left: '10px', top: '9px', color: '#9ca3af' }} />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search category..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{
+                  width: '100%', paddingLeft: '30px', border: '1px solid #cbd5e1',
+                  borderRadius: '6px', fontSize: '0.8rem', padding: '6px 6px 6px 30px',
+                  background: '#f9fafb', color: '#1f2937', boxSizing: 'border-box',
+                  height: '28px'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Option list */}
+          <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: '12px', textAlign: 'center', color: '#9ca3af', fontSize: '0.8rem' }}>
+                No categories found
+              </div>
+            ) : filtered.map(cat => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => { onChange(cat.id); setOpen(false); setSearch(''); }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '8px 12px', background: value === cat.id ? '#eff6ff' : 'transparent',
+                  border: 'none', cursor: 'pointer', fontSize: '0.82rem',
+                  color: value === cat.id ? '#2563eb' : '#374151', textAlign: 'left',
+                  borderBottom: '1px solid #f3f4f6'
+                }}
+              >
+                <span>{cat.name}</span>
+                {value === cat.id && <CheckCircle size={12} style={{ color: '#2563eb' }} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function POS({ token, business, printerCharacteristic }) {
   // Navigation Tabs: 'barcode' | 'item' | 'history'
@@ -378,8 +470,9 @@ function POS({ token, business, printerCharacteristic }) {
   };
 
   const calculateGst = () => {
+    const activeGstRate = business.gstEnabled ? Number(business.gstPercentage || 0) : 0;
     return cart.reduce((sum, item) => {
-      return sum + (((item.price * item.quantity) * item.gstRate) / 100);
+      return sum + (((item.price * item.quantity) * activeGstRate) / 100);
     }, 0);
   };
 
@@ -753,8 +846,9 @@ function POS({ token, business, printerCharacteristic }) {
                       </thead>
                       <tbody>
                         {cart.map((item, idx) => {
+                          const activeGstRate = business.gstEnabled ? Number(business.gstPercentage || 0) : 0;
                           const itemSubtotal = item.price * item.quantity;
-                          const itemTax = (itemSubtotal * item.gstRate) / 100;
+                          const itemTax = (itemSubtotal * activeGstRate) / 100;
                           return (
                             <tr key={item.productId} style={{ borderBottom: '1px solid #f3f4f6' }}>
                               <td style={{ padding: '12px 12px', fontWeight: 600, color: '#1f2937' }}>{item.name}</td>
@@ -771,7 +865,7 @@ function POS({ token, business, printerCharacteristic }) {
                                 </div>
                               </td>
                               <td style={{ padding: '12px 12px', textAlign: 'right', color: '#6b7280' }}>
-                                {item.gstRate}% (₹{itemTax.toFixed(2)})
+                                {activeGstRate}% (₹{itemTax.toFixed(2)})
                               </td>
                               <td style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
                                 ₹{(itemSubtotal + itemTax).toFixed(2)}
@@ -798,30 +892,23 @@ function POS({ token, business, printerCharacteristic }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flexGrow: 1 }}>
               
               {/* Filter controls row */}
-              <div style={{ display: 'flex', gap: '12px', background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e5e7eb', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '12px', background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #cbd5e1', alignItems: 'center' }}>
                 <div style={{ position: 'relative', flex: 1 }}>
-                  <Search size={14} style={{ position: 'absolute', left: '12px', top: '11px', color: '#9ca3af' }} />
+                  <Search size={14} style={{ position: 'absolute', left: '12px', top: '12px', color: '#4b5563' }} />
                   <input
                     type="text"
                     placeholder="Search item by name or short code..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ paddingLeft: '36px', background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', padding: '8px 12px 8px 36px', width: '100%' }}
+                    style={{ display: 'block', width: '100%', boxSizing: 'border-box', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 12px 10px 36px', fontSize: '0.85rem' }}
                   />
                 </div>
 
-                <div style={{ width: '180px' }}>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    style={{ background: '#f9fafb', fontSize: '0.85rem', padding: '8px 12px' }}
-                  >
-                    <option value="">All Categories</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <CategoryDropdown
+                  categories={categories}
+                  value={selectedCategory}
+                  onChange={(id) => setSelectedCategory(id)}
+                />
               </div>
 
               {/* Items Card Grid */}
@@ -1203,6 +1290,87 @@ function POS({ token, business, printerCharacteristic }) {
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* Selected Items / Cart List block */}
+            <div style={{ background: '#ffffff', borderRadius: '12px', padding: '20px 24px', border: '1px solid #e5e7eb', maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f3f4f6', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0 }}>
+                <span>Selected Items</span>
+                <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>({cart.length})</span>
+              </h3>
+              
+              {cart.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: '0.8rem' }}>
+                  No items in cart
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {cart.map((item) => (
+                    <div key={item.productId} style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderBottom: '1px solid #f3f4f6', paddingBottom: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#1f2937' }}>{item.name}</span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#0f172a' }}>
+                          ₹{((item.price * item.quantity) + (((item.price * item.quantity) * (business.gstEnabled ? Number(business.gstPercentage || 0) : 0)) / 100)).toFixed(2)}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>
+                          ₹{Number(item.price).toFixed(2)} each
+                        </span>
+                        
+                        {/* Plus / Minus / Input Controls */}
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <button 
+                            type="button"
+                            onClick={() => handleUpdateQty(item.productId, item.quantity - 1)} 
+                            style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '4px', cursor: 'pointer', color: '#4b5563', padding: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Minus size={10} />
+                          </button>
+                          
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              handleUpdateQty(item.productId, val);
+                            }}
+                            style={{
+                              width: '40px',
+                              textAlign: 'center',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '4px',
+                              padding: '2px 0',
+                              fontSize: '0.78rem',
+                              background: '#ffffff',
+                              color: '#0f172a',
+                              height: '22px'
+                            }}
+                          />
+                          
+                          <button 
+                            type="button"
+                            onClick={() => handleUpdateQty(item.productId, item.quantity + 1)} 
+                            style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '4px', cursor: 'pointer', color: '#4b5563', padding: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Plus size={10} />
+                          </button>
+                          
+                          <button 
+                            type="button"
+                            onClick={() => handleRemoveFromCart(item.productId)}
+                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px', marginLeft: '4px', display: 'flex', alignItems: 'center' }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
