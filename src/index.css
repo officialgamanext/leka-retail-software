@@ -50,8 +50,8 @@
 }
 
 body {
-  background-color: var(--bg-app);
-  color: var(--text-primary);
+  background-color: #f8fafc;
+  color: #1f2937;
   min-height: 100vh;
   overflow-x: hidden;
   background-image:

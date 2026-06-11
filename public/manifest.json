@@ -4,7 +4,7 @@
   "description": "Smart Billing and POS Suite for Retail Businesses",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#090b11",
+  "background_color": "#f8fafc",
   "theme_color": "#2563eb",
   "orientation": "any",
   "icons": [
