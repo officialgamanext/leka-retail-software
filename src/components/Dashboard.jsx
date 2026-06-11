@@ -26,6 +26,7 @@ import ComingSoonPage from './ComingSoonPage';
 import DashboardPage from './DashboardPage';
 import Expenses from './Expenses';
 import StaffPage from './StaffPage';
+import StockAnalysis from './StockAnalysis';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -44,20 +45,6 @@ const MODULE_CONFIG = {
       { icon: <TrendingDown />, label: 'Cost Analysis', desc: 'Track cost trends and negotiate better deals' },
       { icon: <Package />, label: 'Stock Receiving', desc: 'Record goods received and update inventory automatically' },
       { icon: <Star />, label: 'Supplier Ratings', desc: 'Rate and review vendor performance over time' },
-    ]
-  },
-  stock: {
-    title: 'Stock Analysis',
-    desc: 'Get a real-time snapshot of your entire inventory, low-stock alerts, and stock valuation.',
-    icon: <PieChart />,
-    colorClass: 'green',
-    features: [
-      { icon: <Package2 />, label: 'Live Stock Levels', desc: 'Real-time count of all items in inventory' },
-      { icon: <AlertTriangle />, label: 'Low Stock Alerts', desc: 'Automatic notifications when stock is critical' },
-      { icon: <Layers />, label: 'Category Breakdown', desc: 'Stock grouped by product category' },
-      { icon: <DollarSign />, label: 'Stock Valuation', desc: 'Total value of inventory at cost and selling price' },
-      { icon: <Filter />, label: 'Smart Filters', desc: 'Filter by category, price range, or stock status' },
-      { icon: <SortAsc />, label: 'Sort & Export', desc: 'Sort by quantity, value, or name and export' },
     ]
   }
 };
@@ -365,6 +352,8 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
         return renderPageWithBreadcrumb('Expenses', <Expenses token={token} business={business} />);
       case 'staff':
         return renderPageWithBreadcrumb('Staff', <StaffPage token={token} business={business} />);
+      case 'stock':
+        return renderPageWithBreadcrumb('Stock Analysis', <StockAnalysis token={token} business={business} />);
       case 'settings':
         return renderPageWithBreadcrumb('Settings',
           <Settings token={token} business={business} user={user} onSwitchBusiness={onSwitchBusiness} onLogout={onLogout} />
