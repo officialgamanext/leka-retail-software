@@ -144,18 +144,8 @@ function POS({ token, business, printerCharacteristic }) {
   });
   const [syncing, setSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-
-  // Customer directory & Scanner states
-  const [localCustomers, setLocalCustomers] = useState([]);
-  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
-  const [newCustomerPhone, setNewCustomerPhone] = useState('');
-  const [newCustomerName, setNewCustomerName] = useState('');
-  const [newCustomerAddress, setNewCustomerAddress] = useState('');
-  const [customerAddress, setCustomerAddress] = useState('');
-  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
-  const [customerDirectory, setCustomerDirectory] = useState([]);
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [showCameraScanner, setShowCameraScanner] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState('');
   const [customerModalSaving, setCustomerModalSaving] = useState(false);
   const [customerModalError, setCustomerModalError] = useState('');
 
@@ -431,20 +421,34 @@ function POS({ token, business, printerCharacteristic }) {
     }
   };
 
-  // Camera scanner logic
+  // Derived list of unique customers from customerDirectory + history + localCustomers
+  const [localCustomers, setLocalCustomers] = useState([]);
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerAddress, setNewCustomerAddress] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [customerDirectory, setCustomerDirectory] = useState([]);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+
+  // Camera scanner logic (inline scanner)
   useEffect(() => {
     let html5QrCode;
     
-    if (showCameraScanner) {
+    if (cameraActive) {
       const timer = setTimeout(() => {
-        html5QrCode = new Html5Qrcode("camera-reader");
+        html5QrCode = new Html5Qrcode("inline-camera-reader");
         const config = { 
-          fps: 10, 
+          fps: 30, 
           qrbox: (width, height) => {
-            // Square scanning region to allow flexible orientation scans
-            const size = Math.min(width, height) * 0.75;
-            return { width: size, height: size };
+            // Wide horizontal rectangle scanning region optimized for standard 1D barcodes
+            return { 
+              width: Math.min(width * 0.85, 380), 
+              height: Math.min(height * 0.45, 140) 
+            };
           },
+          aspectRatio: 1.777778, // Widescreen format to capture wide barcodes
           formatsToSupport: [
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8,
@@ -455,29 +459,40 @@ function POS({ token, business, printerCharacteristic }) {
             Html5QrcodeSupportedFormats.QR_CODE
           ],
           experimentalFeatures: {
-            useBarCodeDetectorIfSupported: false // Forces reliable ZXing JS engine
+            useBarCodeDetectorIfSupported: true // Native hardware detector for near-instant pickups
           }
         };
         
+        let lastScannedText = "";
+        let lastScannedTime = 0;
+
         html5QrCode.start(
           { facingMode: "environment" },
           config,
           (decodedText) => {
+            const now = Date.now();
+            // Debounce matching barcode scans for 1.5 seconds
+            if (decodedText === lastScannedText && now - lastScannedTime < 1500) {
+              return;
+            }
+            lastScannedText = decodedText;
+            lastScannedTime = now;
+
             const matched = products.find(p => p.barcode === decodedText.trim());
             if (matched) {
               handleAddToCart(matched);
-              setShowCameraScanner(false);
+              setScanFeedback(`Added: ${matched.name} x1`);
+              setTimeout(() => setScanFeedback(''), 3000);
             } else {
-              alert(`Scanned barcode "${decodedText}" but no matching product was found.`);
+              setScanFeedback(`⚠️ Barcode "${decodedText}" not found`);
+              setTimeout(() => setScanFeedback(''), 3000);
             }
           },
-          (errorMessage) => {
-            // Verbose logging skipped
-          }
+          (errorMessage) => {}
         ).catch(err => {
           console.error("Error starting camera scanner: ", err);
-          alert("Could not start camera scanner. Please ensure camera permissions are granted.");
-          setShowCameraScanner(false);
+          alert("Could not access camera. Please ensure camera permissions are granted.");
+          setCameraActive(false);
         });
       }, 300);
 
@@ -498,7 +513,7 @@ function POS({ token, business, printerCharacteristic }) {
         }
       };
     }
-  }, [showCameraScanner, products]);
+  }, [cameraActive, products]);
 
   // Derived list of unique customers from customerDirectory + history + localCustomers
   const getUniqueCustomers = () => {
@@ -1052,47 +1067,101 @@ function POS({ token, business, printerCharacteristic }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flexGrow: 1 }}>
               
               {/* Barcode Scanner Box */}
-              <div style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e5e7eb', display: 'flex', gap: '16px', alignItems: 'center' }}>
-                <div style={{ flex: 1 }}>
-                  <label htmlFor="scan-field" style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4b5563', display: 'block', marginBottom: '6px' }}>
-                    Scan Barcode (Use USB scanner or type code)
-                  </label>
-                  <form onSubmit={handleBarcodeSubmit} style={{ display: 'flex', gap: '10px' }}>
-                    <div style={{ position: 'relative', flex: 1 }}>
-                      <Barcode size={16} style={{ position: 'absolute', left: '12px', top: '13px', color: '#9ca3af' }} />
-                      <input
-                        id="scan-field"
-                        ref={scanInputRef}
-                        type="text"
-                        placeholder="Scan or type item barcode..."
-                        value={scanInput}
-                        onChange={(e) => setScanInput(e.target.value)}
-                        autoFocus
-                        style={{ paddingLeft: '38px', background: '#f9fafb', color: '#0f172a' }}
-                      />
-                    </div>
-                    <button type="submit" className="btn-blue-primary" style={{ width: 'auto', padding: '10px 20px', fontSize: '0.85rem' }}>
-                      Add Item
+              <div style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600, color: '#0f172a' }}>Barcode Scanner</h4>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
+                      {cameraActive ? 'Point product barcode towards camera to add automatically' : 'Start camera scanner or type barcode manually'}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setCameraActive(!cameraActive)}
+                      style={{ 
+                        background: cameraActive ? '#ef4444' : '#2563eb', 
+                        color: '#ffffff', 
+                        padding: '10px 18px', 
+                        borderRadius: '8px', 
+                        border: 'none', 
+                        fontSize: '0.8rem', 
+                        fontWeight: 600, 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <Camera size={14} /> 
+                      {cameraActive ? 'Stop Scanner' : 'Start Camera Scan'}
                     </button>
-                  </form>
+                    {!cameraActive && (
+                      <button 
+                        type="button" 
+                        onClick={() => setShowCameraSimulation(true)}
+                        style={{ background: '#eff6ff', border: 'none', color: '#2563eb', padding: '10px 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <Play size={12} /> Simulate Scan
+                      </button>
+                    )}
+                  </div>
                 </div>
-                
-                <div style={{ borderLeft: '1px solid #e5e7eb', paddingLeft: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <button 
-                    type="button" 
-                    onClick={() => setShowCameraScanner(true)}
-                    style={{ background: '#2563eb', border: 'none', color: '#ffffff', padding: '10px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <Camera size={12} /> Scan (Camera)
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => setShowCameraSimulation(true)}
-                    style={{ background: '#eff6ff', border: 'none', color: '#2563eb', padding: '10px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <Play size={12} /> Simulate Scan
-                  </button>
-                </div>
+
+                {cameraActive ? (
+                  /* Inline Live Scanner Reader Container */
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', width: '100%', maxWidth: '440px', background: '#090b11', borderRadius: '12px', overflow: 'hidden', padding: '8px', boxSizing: 'border-box' }}>
+                      <div id="inline-camera-reader" style={{ width: '100%', minHeight: '260px', borderRadius: '8px', overflow: 'hidden' }}></div>
+                      {/* Overlay scanning laser line */}
+                      <div style={{
+                        position: 'absolute', left: '8px', right: '8px', height: '2px',
+                        background: '#ef4444', top: '50%', boxShadow: '0 0 10px #ef4444',
+                        pointerEvents: 'none', zIndex: 10,
+                        animation: 'scanLineMove 2.5s infinite ease-in-out'
+                      }}></div>
+                    </div>
+                    {scanFeedback && (
+                      <div style={{
+                        width: '100%', maxWidth: '440px',
+                        padding: '8px 12px', borderRadius: '8px',
+                        background: scanFeedback.startsWith('⚠️') ? '#fef2f2' : '#f0fdf4',
+                        color: scanFeedback.startsWith('⚠️') ? '#ef4444' : '#15803d',
+                        fontSize: '0.8rem', fontWeight: 600, textAlign: 'center', marginTop: '12px',
+                        border: scanFeedback.startsWith('⚠️') ? '1px solid #fee2e2' : '1px solid #dcfce7',
+                        animation: 'fadeIn 0.2s ease'
+                      }}>
+                        {scanFeedback}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Manual input fallback fields when camera is stopped */
+                  <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
+                    <label htmlFor="scan-field" style={{ fontSize: '0.78rem', fontWeight: 500, color: '#4b5563', display: 'block', marginBottom: '6px' }}>
+                      Or manually enter barcode number
+                    </label>
+                    <form onSubmit={handleBarcodeSubmit} style={{ display: 'flex', gap: '10px' }}>
+                      <div style={{ position: 'relative', flex: 1 }}>
+                        <Barcode size={16} style={{ position: 'absolute', left: '12px', top: '13px', color: '#9ca3af' }} />
+                        <input
+                          id="scan-field"
+                          ref={scanInputRef}
+                          type="text"
+                          placeholder="Scan or type item barcode..."
+                          value={scanInput}
+                          onChange={(e) => setScanInput(e.target.value)}
+                          autoFocus
+                          style={{ paddingLeft: '38px', background: '#f9fafb', color: '#0f172a' }}
+                        />
+                      </div>
+                      <button type="submit" className="btn-blue-primary" style={{ width: 'auto', padding: '10px 20px', fontSize: '0.85rem' }}>
+                        Add Item
+                      </button>
+                    </form>
+                  </div>
+                )}
               </div>
 
               {/* Scanned Cart Table */}
@@ -1950,52 +2019,6 @@ function POS({ token, business, printerCharacteristic }) {
                 onClick={() => setCheckoutInvoice(null)}
               >
                 Close Bill
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: CAMERA BARCODE SCANNER */}
-      {showCameraScanner && (
-        <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div className="modal-content" style={{ background: '#ffffff', color: '#1f2937', maxWidth: '440px', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Camera size={18} style={{ color: '#2563eb' }} /> Live Camera Barcode Scanner
-              </h3>
-              <button 
-                type="button" 
-                onClick={() => setShowCameraScanner(false)} 
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '16px' }}>
-              Point your camera at the barcode. The product will be added automatically once detected.
-            </p>
-
-            <div style={{ position: 'relative', background: '#090b11', borderRadius: '12px', overflow: 'hidden', padding: '10px', marginBottom: '20px' }}>
-              <div id="camera-reader" style={{ width: '100%', minHeight: '280px', borderRadius: '8px', overflow: 'hidden' }}></div>
-              {/* Overlay scan line */}
-              <div style={{
-                position: 'absolute', left: '10px', right: '10px', height: '2px',
-                background: '#ef4444', top: '50%', boxShadow: '0 0 10px #ef4444',
-                pointerEvents: 'none', zIndex: 10,
-                animation: 'scanLineMove 2.5s infinite ease-in-out'
-              }}></div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button 
-                type="button" 
-                onClick={() => setShowCameraScanner(false)} 
-                className="btn-secondary" 
-                style={{ padding: '10px 24px', fontSize: '0.85rem', fontWeight: 600 }}
-              >
-                Close Scanner
               </button>
             </div>
           </div>
