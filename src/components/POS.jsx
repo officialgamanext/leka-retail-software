@@ -1566,8 +1566,8 @@ function POS({ token, business, printerCharacteristic }) {
       {/* MODAL 3: INVOICE / RECEIPT DETAILS POPUP (FOR PRINTING / VIEWING) */}
       {checkoutInvoice && (
         <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="modal-content" style={{ maxWidth: '380px', background: '#f8fafc', color: '#1e293b', padding: '24px', borderRadius: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.08)', paddingBottom: '12px', marginBottom: '16px' }}>
+          <div className="modal-content" style={{ maxWidth: '380px', width: '90%', background: '#f8fafc', color: '#1e293b', padding: '24px', borderRadius: '16px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.08)', paddingBottom: '12px', marginBottom: '16px', flexShrink: 0 }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0f172a', fontSize: '1rem', fontWeight: 600 }}>
                 <ReceiptText size={18} style={{ color: '#10b981' }} /> Sales Invoice Receipt
               </h3>
@@ -1575,14 +1575,14 @@ function POS({ token, business, printerCharacteristic }) {
                 ✕
               </button>
             </div>
-
-            {/* Print Friendly Format */}
-            <div className="receipt-wrapper" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
+ 
+            {/* Print Friendly Format with scrolling items list inside */}
+            <div className="receipt-wrapper" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', overflowY: 'auto', flexGrow: 1, minHeight: 0 }}>
               <div style={{ textAlign: 'center', borderBottom: '1px dashed #cbd5e1', paddingBottom: '10px', marginBottom: '10px' }}>
                 <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0, color: '#0f172a' }}>{business.name}</h2>
                 <p style={{ fontSize: '0.7rem', color: '#64748b', margin: '4px 0 0 0' }}>{business.address}</p>
               </div>
-
+ 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#475569', marginBottom: '4px' }}>
                 <span>Bill No: <strong>{checkoutInvoice.invoiceNumber}</strong></span>
                 <span>Date: {new Date(checkoutInvoice.createdAt?._seconds ? checkoutInvoice.createdAt._seconds * 1000 : checkoutInvoice.createdAt).toLocaleDateString()}</span>
@@ -1591,9 +1591,9 @@ function POS({ token, business, printerCharacteristic }) {
                 <span>Customer: {checkoutInvoice.customerName}</span>
                 <span>{checkoutInvoice.customerPhone && `Mob: ${checkoutInvoice.customerPhone}`}</span>
               </div>
-
+ 
               <div style={{ borderTop: '1px dashed #cbd5e1', margin: '8px 0' }}></div>
-
+ 
               {/* Items List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {checkoutInvoice.items?.map((item, idx) => (
@@ -1609,9 +1609,9 @@ function POS({ token, business, printerCharacteristic }) {
                   </div>
                 ))}
               </div>
-
+ 
               <div style={{ borderTop: '1px dashed #cbd5e1', margin: '10px 0' }}></div>
-
+ 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.75rem', color: '#475569' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Subtotal:</span>
@@ -1628,21 +1628,21 @@ function POS({ token, business, printerCharacteristic }) {
                   </div>
                 )}
               </div>
-
+ 
               <div style={{ borderTop: '1px dashed #cbd5e1', margin: '10px 0' }}></div>
-
+ 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a' }}>
                 <span>GRAND TOTAL:</span>
                 <span>₹{checkoutInvoice.grandTotal?.toFixed(2)}</span>
               </div>
-
+ 
               <div style={{ borderTop: '1px dashed #cbd5e1', margin: '8px 0' }}></div>
               <div style={{ display: 'flex', justifyContent: 'center', fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>
                 Status: {checkoutInvoice.status === 'Open' ? 'UNSETTLED (OPEN)' : `PAID via ${checkoutInvoice.paymentMethod}`}
               </div>
             </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+ 
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', flexShrink: 0 }}>
               {printerCharacteristic ? (
                 <button 
                   type="button" 
@@ -1664,16 +1664,8 @@ function POS({ token, business, printerCharacteristic }) {
               )}
               <button 
                 type="button" 
-                className="btn btn-secondary" 
-                style={{ background: '#e2e8f0', color: '#1e293b', border: 'none', fontSize: '0.8rem', padding: '8px 14px', cursor: 'pointer' }}
-                onClick={() => window.print()}
-              >
-                Browser Print
-              </button>
-              <button 
-                type="button" 
                 className="btn btn-success" 
-                style={{ background: '#2563eb', border: 'none', color: '#ffffff', fontSize: '0.8rem', padding: '8px 14px' }}
+                style={{ background: '#2563eb', border: 'none', color: '#ffffff', fontSize: '0.8rem', padding: '8px 14px', cursor: 'pointer' }}
                 onClick={() => setCheckoutInvoice(null)}
               >
                 Close Bill
