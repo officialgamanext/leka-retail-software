@@ -346,14 +346,14 @@ function Onboarding({ token, user, onSelectBusiness, onLogout, securityMessage, 
       {/* Right Column Main Panel */}
       <div className="onboard-right-main">
         {/* Header section */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div className="onboard-header-row">
           <div>
             <h2 style={{ fontSize: '1.6rem', color: '#0f172a', fontWeight: 600 }}>Your Businesses</h2>
             <p style={{ color: '#6b7280', fontSize: '0.85rem', marginTop: '4px' }}>
               View and manage all your businesses from here.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div className="onboard-header-actions">
             <button className="btn btn-secondary" onClick={onLogout} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
               <LogOut size={14} /> Log Out
             </button>
@@ -604,6 +604,127 @@ function Onboarding({ token, user, onSelectBusiness, onLogout, securityMessage, 
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Cards Container */}
+            <div className="onboard-cards-container">
+              {currentItems.map((biz) => {
+                const { initials, style } = getAvatarStyle(biz.name);
+                const statusCheck = checkSubscriptionStatus(biz);
+                
+                const createdDate = biz.createdAt?._seconds 
+                  ? new Date(biz.createdAt._seconds * 1000) 
+                  : new Date(biz.createdAt || Date.now());
+                
+                const formattedCreated = createdDate.toLocaleDateString(undefined, {
+                  day: '2-digit', month: 'short', year: 'numeric'
+                });
+
+                const formattedExpiry = statusCheck.expiryDate 
+                  ? statusCheck.expiryDate.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
+                  : '—';
+
+                const isMenuOpen = openMenuId === biz.id;
+
+                return (
+                  <div key={biz.id} className="onboard-business-card">
+                    {/* Top Row: Name and Actions Menu */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                      <div className="biz-name-cell" style={{ gap: '12px' }}>
+                        <div className="avatar-circle" style={{ backgroundColor: style.bg, color: style.color, margin: 0 }}>
+                          {initials}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, color: '#1f2937', fontSize: '0.92rem' }}>{biz.name}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '2px' }}>
+                            {biz.address}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Dots Actions Menu dropdown */}
+                      <div className="dots-menu-container" ref={isMenuOpen ? menuRef : null}>
+                        <button 
+                          className="dots-actions-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(isMenuOpen ? null : biz.id);
+                          }}
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                        
+                        {isMenuOpen && (
+                          <div className="dots-dropdown-menu" style={{ top: '28px', right: 0 }}>
+                            <button 
+                              className="dots-menu-item"
+                              onClick={() => handleDemoToggleActive(biz.id)}
+                            >
+                              <Power size={12} />
+                              Toggle License Status
+                            </button>
+                            <button 
+                              className="dots-menu-item danger-action"
+                              onClick={() => handleDeleteBusiness(biz.id)}
+                            >
+                              <Trash2 size={12} />
+                              Delete Business
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Middle Row: Meta details */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(2, 1fr)',
+                      gap: '10px',
+                      background: '#f8fafc',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      fontSize: '0.75rem',
+                      color: '#4b5563'
+                    }}>
+                      <div>
+                        <span style={{ color: '#9ca3af', display: 'block', fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase' }}>Phone</span>
+                        <strong style={{ color: '#374151', fontFamily: 'monospace' }}>{user?.phone || '—'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#9ca3af', display: 'block', fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase' }}>Plan</span>
+                        <strong style={{ color: '#374151' }}>{statusCheck.status === 'Inactive' ? 'Basic' : 'Premium'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#9ca3af', display: 'block', fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase' }}>Expiry</span>
+                        <strong style={{ 
+                          color: statusCheck.status === 'Expiring Soon' ? '#ef4444' : '#374151'
+                        }}>
+                          {formattedExpiry}
+                        </strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#9ca3af', display: 'block', fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase' }}>Created</span>
+                        <strong style={{ color: '#374151' }}>{formattedCreated}</strong>
+                      </div>
+                    </div>
+
+                    {/* Bottom Row: Status Badge and Open button */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                      <span className={`table-badge ${statusCheck.class}`} style={{ margin: 0, padding: '3px 8px', fontSize: '0.72rem' }}>
+                        ● {statusCheck.label}
+                      </span>
+                      <button 
+                        className="open-terminal-btn"
+                        onClick={() => handleSelectBusiness(biz)}
+                        style={{ padding: '6px 14px', fontSize: '0.78rem' }}
+                      >
+                        Open <ExternalLink size={12} />
+                      </button>
+                    </div>
+
+                  </div>
+                );
+              })}
             </div>
 
             {/* Pagination Controls */}

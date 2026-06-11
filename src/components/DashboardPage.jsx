@@ -252,7 +252,7 @@ function DashboardPage({ token, business }) {
       {/* Date Filter Toolbar */}
       <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.01)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <div className="horizontal-swipe-list" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {[
               { id: 'today', label: 'Today' },
               { id: 'yesterday', label: 'Yesterday' },
@@ -422,7 +422,7 @@ function DashboardPage({ token, business }) {
               </div>
 
               {/* Legend Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+              <div className="payment-legend-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
                 {[
                   { label: 'Cash', value: paymentDetails.cash, pct: cashPct, color: '#3b82f6' },
                   { label: 'UPI / Digital', value: paymentDetails.upi, pct: upiPct, color: '#10b981' },

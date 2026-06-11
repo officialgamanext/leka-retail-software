@@ -146,7 +146,7 @@ function StockAnalysis({ token, business }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
       {/* Upper header action row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="page-header-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>Stock Analysis</h2>
           <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '2px' }}>
@@ -365,7 +365,7 @@ function StockAnalysis({ token, business }) {
             </div>
 
             {/* Inventory table */}
-            <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div className="data-table-container" style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
@@ -532,7 +532,7 @@ function StockAnalysis({ token, business }) {
             </div>
 
             {/* Modal scroll area */}
-            <div style={{ maxHeight: '360px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+            <div className="data-table-container" style={{ maxHeight: '360px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>

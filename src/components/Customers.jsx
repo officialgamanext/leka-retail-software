@@ -143,7 +143,7 @@ function Customers({ token, business }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div className="page-header-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a' }}>Customer Directory</h2>
           <p style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '2px' }}>
@@ -167,7 +167,7 @@ function Customers({ token, business }) {
       )}
 
       {/* Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '24px' }}>
+      <div className="stats-grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '24px' }}>
         {[
           { label: 'Total Customers', value: totalCount, desc: 'Registered in database', color: '#2563eb', bg: '#eff6ff', icon: <Users size={20} /> },
           { label: 'With Address', value: withAddressCount, desc: 'Delivery profiles', color: '#10b981', bg: '#ecfdf5', icon: <MapPin size={20} /> },
@@ -187,7 +187,7 @@ function Customers({ token, business }) {
       </div>
 
       {/* Search and filter bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '16px' }}>
+      <div className="search-filter-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '16px' }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: '450px' }}>
           <Search 
             size={18} 
@@ -225,7 +225,7 @@ function Customers({ token, business }) {
           <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>Try searching with a different name or add a new customer profile.</p>
         </div>
       ) : (
-        <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
+        <div className="data-table-container" style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>

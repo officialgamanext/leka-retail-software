@@ -797,7 +797,7 @@ function Items({ token, business, printerCharacteristic, printerDevice }) {
     <div style={{ background: '#f8fafc', minHeight: '100%' }}>
 
       {/* ── Page Header ── */}
-      <div style={{
+      <div className="page-header-container" style={{
         background: '#ffffff', borderBottom: '1px solid #e5e7eb',
         padding: '20px 28px', display: 'flex', alignItems: 'center', gap: '16px'
       }}>
@@ -848,7 +848,7 @@ function Items({ token, business, printerCharacteristic, printerDevice }) {
             transition: 'all 0.3s ease'
           }}>
             {/* Search + Add Row */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+            <div className="search-filter-container" style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
               <div style={{ position: 'relative', flex: 1 }}>
                 <Search size={14} style={{ position: 'absolute', left: '12px', top: '11px', color: '#9ca3af' }} />
                 <input
@@ -991,11 +991,11 @@ function Items({ token, business, printerCharacteristic, printerDevice }) {
            ITEMS TAB
          ════════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'items' && (
-        <div style={{ display: 'flex', gap: 0, minHeight: 'calc(100vh - 140px)' }}>
+        <div className="items-layout-container" style={{ display: 'flex', gap: 0, minHeight: 'calc(100vh - 140px)' }}>
           {/* Left — Items List */}
           <div style={{ flex: 1, padding: '24px 28px', overflow: 'auto' }}>
             {/* Search + Add Row */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+            <div className="search-filter-container" style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
               <div style={{ position: 'relative', flex: 1 }}>
                 <Search size={14} style={{ position: 'absolute', left: '12px', top: '11px', color: '#9ca3af' }} />
                 <input
@@ -1054,7 +1054,7 @@ function Items({ token, business, printerCharacteristic, printerDevice }) {
                 </p>
               </div>
             ) : (
-              <div style={{
+              <div className="data-table-container" style={{
                 background: '#ffffff', border: '1px solid #e5e7eb',
                 borderRadius: '12px', overflow: 'hidden'
               }}>
@@ -1184,7 +1184,7 @@ function Items({ token, business, printerCharacteristic, printerDevice }) {
 
           {/* Right — Add / Edit Item Form */}
           {showItemForm && (
-            <div style={{
+            <div className="items-form-panel" style={{
               width: '400px', flexShrink: 0,
               background: '#ffffff', borderLeft: '1px solid #e5e7eb',
               overflowY: 'auto', animation: 'slideInRight 0.2s ease'

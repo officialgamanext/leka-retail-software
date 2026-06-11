@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { 
   Store, Calendar, ShieldCheck, RefreshCw, LogOut, 
-  Percent, Save, Loader2, AlertTriangle, CheckCircle 
+  Percent, Save, Loader2, AlertTriangle, CheckCircle, Printer 
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-function Settings({ token, business, user, onSwitchBusiness, onLogout }) {
+function Settings({ token, business, user, onSwitchBusiness, onLogout, printerDevice, printerConnecting, handleConnectPrinter }) {
   const [name, setName] = useState(business.name || '');
   const [address, setAddress] = useState(business.address || '');
   const [gstEnabled, setGstEnabled] = useState(business.gstEnabled || false);
@@ -271,6 +271,67 @@ function Settings({ token, business, user, onSwitchBusiness, onLogout }) {
                 <LogOut size={14} /> Log Out Terminal
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Card 4: Hardware & Printer Settings */}
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '14px' }}>
+            <div style={{ padding: '8px', background: '#f5f3ff', color: '#7c3aed', borderRadius: '8px', display: 'flex' }}>
+              <Printer size={20} />
+            </div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: '#1e293b', margin: 0 }}>Printer Settings</h3>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>Receipt Printer</label>
+              <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '0 0 12px 0' }}>
+                Connect a Bluetooth thermal printer to print worksheets and checkout receipts.
+              </p>
+              
+              <button
+                type="button"
+                onClick={handleConnectPrinter}
+                disabled={printerConnecting}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  background: printerDevice ? '#ecfdf5' : '#eff6ff',
+                  color: printerDevice ? '#059669' : '#2563eb',
+                  border: printerDevice ? '1px solid #a7f3d0' : '1px solid #bfdbfe',
+                  borderRadius: '8px',
+                  padding: '12px 20px',
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  width: '100%',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {printerConnecting ? (
+                  <><Loader2 className="animate-spin" size={16} /> Connecting...</>
+                ) : printerDevice ? (
+                  <><CheckCircle size={16} /> Printer Connected ({printerDevice.name || 'BT Printer'})</>
+                ) : (
+                  <><Printer size={16} /> Connect Bluetooth Printer</>
+                )}
+              </button>
+            </div>
+
+            {printerDevice && (
+              <div style={{ animation: 'fadeIn 0.2s ease', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <CheckCircle size={16} style={{ color: '#059669', flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <span style={{ fontSize: '0.82rem', color: '#047857', fontWeight: 600, display: 'block' }}>Printer Active</span>
+                  <span style={{ fontSize: '0.72rem', color: '#065f46', marginTop: '2px', display: 'block' }}>
+                    Your terminal is connected and ready to print checkout bills.
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

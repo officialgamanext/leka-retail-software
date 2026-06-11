@@ -114,8 +114,8 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
   }, [business.isStaff]);
 
   const [subscriptionKicked, setSubscriptionKicked] = useState(false);
-  const [showStoreDropdown, setShowStoreDropdown]   = useState(false);
-  const [showAdminDropdown, setShowAdminDropdown]   = useState(false);
+  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+  const [showAdminDropdown, setShowAdminDropdown] = useState(false);
   const storeMenuRef = useRef(null);
   const adminMenuRef = useRef(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -167,12 +167,12 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
 
       setPrinterDevice(device);
       setPrinterCharacteristic(characteristic);
-      
+
       device.addEventListener('gattserverdisconnected', () => {
         setPrinterDevice(null);
         setPrinterCharacteristic(null);
       });
-      
+
       alert(`Connected to ${device.name || 'Printer'} successfully!`);
     } catch (err) {
       alert(`Connection failed: ${err.message}`);
@@ -239,15 +239,15 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
 
   // ── Home Grid Cards ───────────────────────────────────────────────────────
   const cards = [
-    { id: 'dashboard-view', title: 'Dashboard',   desc: 'Real-time sales, stats and warnings summary',      icon: <BarChart3 />,   colorClass: 'blue'   },
-    { id: 'pos',       title: 'Billing',             desc: 'Create invoices and process sales quickly',          icon: <Calculator />,  colorClass: 'blue'   },
-    { id: 'products',  title: 'Products',            desc: 'Manage product stock, categories and prices',       icon: <Package />,     colorClass: 'green'  },
-    { id: 'customers', title: 'Customer',            desc: 'Add and manage customer information',               icon: <Users />,       colorClass: 'purple' },
-    { id: 'vendors',   title: 'Vendors',             desc: 'Manage vendor details and transactions',            icon: <Truck />,       colorClass: 'yellow' },
-    { id: 'staff',     title: 'Staff',               desc: 'Manage users and set permissions',                 icon: <ShieldAlert />, colorClass: 'pink'   },
-    { id: 'expenses',  title: 'Expenses',            desc: 'Add and manage business expenses',                  icon: <Wallet />,      colorClass: 'orange' },
-    { id: 'stock',     title: 'Stock Analysis',      desc: 'Check stock availability and low stock alerts',    icon: <PieChart />,    colorClass: 'green'  },
-    { id: 'settings',  title: 'Settings',            desc: 'Configure store settings and preferences',         icon: <SettingsIcon />,colorClass: 'blue'   },
+    { id: 'dashboard-view', title: 'Dashboard', desc: 'Real-time sales, stats and warnings summary', icon: <BarChart3 />, colorClass: 'blue' },
+    { id: 'pos', title: 'Billing', desc: 'Create invoices and process sales quickly', icon: <Calculator />, colorClass: 'blue' },
+    { id: 'products', title: 'Products', desc: 'Manage product stock, categories and prices', icon: <Package />, colorClass: 'green' },
+    { id: 'customers', title: 'Customer', desc: 'Add and manage customer information', icon: <Users />, colorClass: 'purple' },
+    { id: 'vendors', title: 'Vendors', desc: 'Manage vendor details and transactions', icon: <Truck />, colorClass: 'yellow' },
+    { id: 'staff', title: 'Staff', desc: 'Manage users and set permissions', icon: <ShieldAlert />, colorClass: 'pink' },
+    { id: 'expenses', title: 'Expenses', desc: 'Add and manage business expenses', icon: <Wallet />, colorClass: 'orange' },
+    { id: 'stock', title: 'Stock Analysis', desc: 'Check stock availability and low stock alerts', icon: <PieChart />, colorClass: 'green' },
+    { id: 'settings', title: 'Settings', desc: 'Configure store settings and preferences', icon: <SettingsIcon />, colorClass: 'blue' },
   ];
 
   // ── Render Home Grid ─────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
   // ── Breadcrumb wrapper for existing full pages ────────────────────────────────
   const renderPageWithBreadcrumb = (label, child) => (
     <div className="light-dashboard-content">
-      <div style={{ padding: '24px 32px' }}>
+      <div className="dashboard-page-container" style={{ padding: '24px 32px' }}>
         <div className="breadcrumb-bar">
           <button className="breadcrumb-back-btn" onClick={() => setActiveTab('home')}>
             <ArrowLeft size={14} /> Back to Home
@@ -322,28 +322,28 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
       case 'pos':
         if (business.isStaff) {
           return (
-            <div className="light-dashboard-content" style={{ padding: '24px 32px' }}>
-              <POS 
-                token={token} 
-                business={business} 
-                printerCharacteristic={printerCharacteristic} 
+            <div className="light-dashboard-content dashboard-page-container" style={{ padding: '24px 32px' }}>
+              <POS
+                token={token}
+                business={business}
+                printerCharacteristic={printerCharacteristic}
               />
             </div>
           );
         }
-        return renderPageWithBreadcrumb('Billing', 
-          <POS 
-            token={token} 
-            business={business} 
-            printerCharacteristic={printerCharacteristic} 
+        return renderPageWithBreadcrumb('Billing',
+          <POS
+            token={token}
+            business={business}
+            printerCharacteristic={printerCharacteristic}
           />
         );
       case 'products':
         return renderPageWithBreadcrumb('Products',
-          <Items 
-            token={token} 
-            business={business} 
-            printerCharacteristic={printerCharacteristic} 
+          <Items
+            token={token}
+            business={business}
+            printerCharacteristic={printerCharacteristic}
             printerDevice={printerDevice}
           />
         );
@@ -359,7 +359,16 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
         return renderPageWithBreadcrumb('Stock Analysis', <StockAnalysis token={token} business={business} />);
       case 'settings':
         return renderPageWithBreadcrumb('Settings',
-          <Settings token={token} business={business} user={user} onSwitchBusiness={onSwitchBusiness} onLogout={onLogout} />
+          <Settings
+            token={token}
+            business={business}
+            user={user}
+            onSwitchBusiness={onSwitchBusiness}
+            onLogout={onLogout}
+            printerDevice={printerDevice}
+            printerConnecting={printerConnecting}
+            handleConnectPrinter={handleConnectPrinter}
+          />
         );
 
       // ── Coming Soon pages (each is a full secured page, business-specific) ──
@@ -426,6 +435,7 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
       <header className="home-topbar">
         {/* Brand Logo */}
         <div
+          className="topbar-brand"
           onClick={() => {
             if (!business.isStaff) {
               setActiveTab('home');
@@ -433,17 +443,17 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
           }}
           style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: business.isStaff ? 'default' : 'pointer' }}
         >
-          <div className="brand-icon-box" style={{ width: '40px', height: '40px', borderRadius: '10px', margin: 0 }}>
+          <div className="brand-icon-box topbar-logo-icon" style={{ width: '40px', height: '40px', borderRadius: '10px', margin: 0 }}>
             <ShoppingCart size={20} strokeWidth={2.5} />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.2rem', fontWeight: 600, color: '#0f172a', lineHeight: 1 }}>LEKA RETAIL</h1>
-            <span style={{ fontSize: '0.7rem', color: '#6b7280', fontWeight: 500 }}>Smart Billing, Better Business</span>
+            <h1 className="topbar-title" style={{ fontSize: '1.2rem', fontWeight: 600, color: '#0f172a', lineHeight: 1 }}>LEKA RETAIL</h1>
+            <span className="topbar-subtitle" style={{ fontSize: '0.7rem', color: '#6b7280', fontWeight: 500 }}>Smart Billing, Better Business</span>
           </div>
         </div>
 
         {/* Universal Search */}
-        <div style={{ position: 'relative', width: '380px' }}>
+        <div className="topbar-search" style={{ position: 'relative', width: '380px' }}>
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#9ca3af' }} />
           <input
             type="text"
@@ -457,35 +467,7 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
         </div>
 
         {/* Right Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {/* Bluetooth Printer Connection */}
-          <button
-            type="button"
-            onClick={handleConnectPrinter}
-            disabled={printerConnecting}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: printerDevice ? '#ecfdf5' : '#eff6ff',
-              color: printerDevice ? '#059669' : '#2563eb',
-              border: printerDevice ? '1px solid #a7f3d0' : '1px solid #bfdbfe',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {printerConnecting ? (
-              <><Loader2 className="animate-spin" size={12} /> Connecting...</>
-            ) : printerDevice ? (
-              <><CheckCircle size={12} /> Printer Connected</>
-            ) : (
-              <><Printer size={12} /> Connect Printer</>
-            )}
-          </button>
+        <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           {/* Bell */}
           <div style={{ position: 'relative', cursor: 'pointer' }}>
             <Bell size={20} style={{ color: '#4b5563' }} />
@@ -500,13 +482,13 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
           <div className="dots-menu-container" ref={storeMenuRef}>
             <button
               type="button"
-              className="btn btn-secondary"
+              className="btn btn-secondary topbar-store-btn"
               style={{ background: '#ffffff', border: '1px solid #e5e7eb', color: '#374151', padding: '8px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600 }}
               onClick={() => setShowStoreDropdown(!showStoreDropdown)}
             >
-              <Store size={14} style={{ marginRight: '6px', color: '#2563eb' }} />
-              {business.name}
-              <ChevronDown size={14} style={{ marginLeft: '6px', color: '#9ca3af' }} />
+              <Store size={14} style={{ marginRight: '6px', color: '#2563eb', flexShrink: 0 }} />
+              <span className="topbar-store-name">{business.name}</span>
+              <ChevronDown size={14} style={{ marginLeft: '6px', color: '#9ca3af', flexShrink: 0 }} />
             </button>
             {showStoreDropdown && (
               <div className="dots-dropdown-menu" style={{ width: '180px', top: '42px' }}>
@@ -530,7 +512,7 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
               <div className="user-avatar" style={{ margin: 0, backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid rgba(37,99,235,0.1)' }}>
                 <User size={16} />
               </div>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
+              <span className="topbar-username" style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
                 {business.isStaff ? 'Staff ⌵' : 'Admin ⌵'}
               </span>
             </div>

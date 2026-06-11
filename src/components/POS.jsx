@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { 
-  Search, ShoppingBag, Trash2, Tag, CreditCard, Banknote, 
-  Landmark, Loader2, Sparkles, ReceiptText, Barcode, Eye, 
+import {
+  Search, ShoppingBag, Trash2, Tag, CreditCard, Banknote,
+  Landmark, Loader2, Sparkles, ReceiptText, Barcode, Eye,
   Plus, Minus, CheckCircle, Printer, AlertTriangle, Play, X, Wallet, RefreshCw,
   UserPlus, Camera, MapPin, ChevronDown, Package
 } from 'lucide-react';
@@ -12,7 +12,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 // ─── Custom Category Dropdown for POS ─────────────────────────────────────────
 function CategoryDropdown({ categories, value, onChange }) {
-  const [open, setOpen]     = useState(false);
+  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef(null);
 
@@ -24,11 +24,11 @@ function CategoryDropdown({ categories, value, onChange }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const allOptions  = [{ id: '', name: 'All Categories' }, ...categories];
-  const filtered    = allOptions.filter(c =>
+  const allOptions = [{ id: '', name: 'All Categories' }, ...categories];
+  const filtered = allOptions.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase())
   );
-  const selected    = allOptions.find(c => c.id === value) || allOptions[0];
+  const selected = allOptions.find(c => c.id === value) || allOptions[0];
 
   return (
     <div ref={ref} style={{ position: 'relative', width: '180px', flexShrink: 0 }}>
@@ -184,7 +184,7 @@ function POS({ token, business, printerCharacteristic }) {
             createdAt: bill.createdAt
           }, { headers: headersConfig });
         }
-        
+
         if (response && response.data.success) {
           successCount++;
         } else {
@@ -402,13 +402,13 @@ function POS({ token, business, printerCharacteristic }) {
         // Update local session array and master directory
         setLocalCustomers([newCust, ...localCustomers]);
         setCustomerDirectory([newCust, ...customerDirectory]);
-        
+
         // Auto-select the newly saved customer
         setCustomerPhone(newCust.phone);
         setCustomerName(newCust.name);
         setCustomerAddress(newCust.address || '');
         setCustomerSearchQuery('');
-        
+
         setShowAddCustomerModal(false);
         setNewCustomerName('');
         setNewCustomerPhone('');
@@ -435,17 +435,17 @@ function POS({ token, business, printerCharacteristic }) {
   // Camera scanner logic (inline scanner)
   useEffect(() => {
     let html5QrCode;
-    
+
     if (cameraActive) {
       const timer = setTimeout(() => {
         html5QrCode = new Html5Qrcode("inline-camera-reader");
-        const config = { 
-          fps: 30, 
+        const config = {
+          fps: 30,
           qrbox: (width, height) => {
             // Wide horizontal rectangle scanning region optimized for standard 1D barcodes
-            return { 
-              width: Math.min(width * 0.85, 380), 
-              height: Math.min(height * 0.45, 140) 
+            return {
+              width: Math.min(width * 0.85, 380),
+              height: Math.min(height * 0.45, 140)
             };
           },
           aspectRatio: 1.777778, // Widescreen format to capture wide barcodes
@@ -462,7 +462,7 @@ function POS({ token, business, printerCharacteristic }) {
             useBarCodeDetectorIfSupported: true // Native hardware detector for near-instant pickups
           }
         };
-        
+
         let lastScannedText = "";
         let lastScannedTime = 0;
 
@@ -488,7 +488,7 @@ function POS({ token, business, printerCharacteristic }) {
               setTimeout(() => setScanFeedback(''), 3000);
             }
           },
-          (errorMessage) => {}
+          (errorMessage) => { }
         ).catch(err => {
           console.error("Error starting camera scanner: ", err);
           alert("Could not access camera. Please ensure camera permissions are granted.");
@@ -560,10 +560,10 @@ function POS({ token, business, printerCharacteristic }) {
 
   const uniqueCustomers = getUniqueCustomers();
   const filteredCustomers = customerSearchQuery.trim()
-    ? uniqueCustomers.filter(c => 
-        c.phone.includes(customerSearchQuery.trim()) || 
-        c.name.toLowerCase().includes(customerSearchQuery.toLowerCase())
-      )
+    ? uniqueCustomers.filter(c =>
+      c.phone.includes(customerSearchQuery.trim()) ||
+      c.name.toLowerCase().includes(customerSearchQuery.toLowerCase())
+    )
     : uniqueCustomers.slice(0, 10);
 
 
@@ -583,8 +583,8 @@ function POS({ token, business, printerCharacteristic }) {
     }
 
     if (existing) {
-      setCart(cart.map(item => 
-        item.productId === product.id 
+      setCart(cart.map(item =>
+        item.productId === product.id
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
@@ -612,8 +612,8 @@ function POS({ token, business, printerCharacteristic }) {
       return;
     }
 
-    setCart(cart.map(item => 
-      item.productId === productId 
+    setCart(cart.map(item =>
+      item.productId === productId
         ? { ...item, quantity: newQty }
         : item
     ));
@@ -661,7 +661,7 @@ function POS({ token, business, printerCharacteristic }) {
       alert(`No product found matching barcode: "${scanInput}"`);
       setScanInput('');
     }
-    
+
     // Maintain input focus
     setTimeout(() => scanInputRef.current?.focus(), 50);
   };
@@ -701,8 +701,8 @@ function POS({ token, business, printerCharacteristic }) {
       // 4. Metadata (Left align)
       commands.push(0x1B, 0x61, 0x00); // Left align
       pushText(`Bill No: ${invoice.invoiceNumber}\n`);
-      const dateVal = invoice.createdAt?._seconds 
-        ? new Date(invoice.createdAt._seconds * 1000) 
+      const dateVal = invoice.createdAt?._seconds
+        ? new Date(invoice.createdAt._seconds * 1000)
         : new Date(invoice.createdAt);
       pushText(`Date: ${dateVal.toLocaleDateString()} ${dateVal.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}\n`);
       pushText(`Customer: ${invoice.customerName || 'Walk-in'}\n`);
@@ -719,16 +719,16 @@ function POS({ token, business, printerCharacteristic }) {
       invoice.items?.forEach(item => {
         // Line 1: Item Name
         pushText(`${item.name}\n`);
-        
+
         // Line 2: Details (Qty x Price and Total aligned)
         const qtyPriceStr = `  ${item.quantity} x Rs.${Number(item.price).toFixed(2)}`;
         const totalStr = `Rs.${Number(item.total).toFixed(2)}`;
-        
+
         // Calculate spaces between details and total
         // Total line width is 32 characters
         const spacesCount = Math.max(1, 32 - qtyPriceStr.length - totalStr.length);
         const spaces = " ".repeat(spacesCount);
-        
+
         pushText(`${qtyPriceStr}${spaces}${totalStr}\n`);
       });
 
@@ -760,12 +760,12 @@ function POS({ token, business, printerCharacteristic }) {
       pushText("Thank you for shopping!\n");
       pushText("Please visit again!\n");
       pushText(`Status: ${invoice.status === 'Open' ? 'UNSETTLED (OPEN)' : 'PAID'}\n`);
-      
+
       // Feed paper 4 lines
       commands.push(0x1B, 0x64, 0x04);
 
       const data = new Uint8Array(commands);
-      
+
       // Chunk write in 20-byte payloads to fit BLE GATT MTU limitations
       const chunkSize = 20;
       for (let offset = 0; offset < data.length; offset += chunkSize) {
@@ -940,24 +940,24 @@ function POS({ token, business, printerCharacteristic }) {
 
   // Filtered lists for Tab 2: Item Billing
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (p.shortCode && p.shortCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                          (p.barcode && p.barcode.includes(searchQuery));
-    
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.shortCode && p.shortCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (p.barcode && p.barcode.includes(searchQuery));
+
     const matchesCategory = selectedCategory === '' || p.categoryId === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   // Filtered lists for Tab 3: History Search
-  const filteredHistory = history.filter(inv => 
+  const filteredHistory = history.filter(inv =>
     inv.invoiceNumber.toLowerCase().includes(historySearch.toLowerCase()) ||
     inv.customerName.toLowerCase().includes(historySearch.toLowerCase()) ||
     (inv.customerPhone && inv.customerPhone.includes(historySearch))
   );
 
   return (
-    <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '20px', minHeight: 'calc(100vh - 70px)', background: '#f8fafc' }}>
-      
+    <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '20px', minHeight: 'calc(100vh - 70px)', background: '#f8fafc' }}>
+
       {/* Offline Sync Indicator Bar */}
       <div style={{
         display: 'flex',
@@ -1016,7 +1016,7 @@ function POS({ token, business, printerCharacteristic }) {
       </div>
 
       {/* Tab Header & Switcher */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', paddingBottom: '16px' }}>
+      <div className="pos-header-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', paddingBottom: '16px' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ShoppingBag size={20} style={{ color: '#2563eb' }} /> Billing Terminal (POS)
@@ -1027,7 +1027,7 @@ function POS({ token, business, printerCharacteristic }) {
         </div>
 
         {/* Navigation Tabs */}
-        <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '10px', padding: '4px' }}>
+        <div className="pos-tab-header" style={{ display: 'flex', background: '#f3f4f6', borderRadius: '10px', padding: '4px' }}>
           {[
             { id: 'barcode', label: 'Barcode Billing', icon: <Barcode size={13} /> },
             { id: 'item', label: 'Item Billing', icon: <Tag size={13} /> },
@@ -1057,15 +1057,15 @@ function POS({ token, business, printerCharacteristic }) {
       </div>
 
       {/* Main Layout Area */}
-      <div style={{ display: 'flex', gap: '24px', flexGrow: 1, alignItems: 'stretch' }}>
-        
+      <div className="pos-terminal-layout" style={{ display: 'flex', gap: '24px', flexGrow: 1, alignItems: 'stretch' }}>
+
         {/* Left Interactive Side */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
+        <div className="pos-main-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
           {/* TAB 1: BARCODE BILLING */}
           {activeTab === 'barcode' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flexGrow: 1 }}>
-              
+
               {/* Barcode Scanner Box */}
               <div style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -1076,30 +1076,30 @@ function POS({ token, business, printerCharacteristic }) {
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setCameraActive(!cameraActive)}
-                      style={{ 
-                        background: cameraActive ? '#ef4444' : '#2563eb', 
-                        color: '#ffffff', 
-                        padding: '10px 18px', 
-                        borderRadius: '8px', 
-                        border: 'none', 
-                        fontSize: '0.8rem', 
-                        fontWeight: 600, 
-                        cursor: 'pointer', 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                      style={{
+                        background: cameraActive ? '#ef4444' : '#2563eb',
+                        color: '#ffffff',
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
                         gap: '6px',
                         transition: 'all 0.2s ease'
                       }}
                     >
-                      <Camera size={14} /> 
+                      <Camera size={14} />
                       {cameraActive ? 'Stop Scanner' : 'Start Camera Scan'}
                     </button>
                     {!cameraActive && (
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => setShowCameraSimulation(true)}
                         style={{ background: '#eff6ff', border: 'none', color: '#2563eb', padding: '10px 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                       >
@@ -1177,7 +1177,7 @@ function POS({ token, business, printerCharacteristic }) {
                     <p style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>Scan a barcode or use the simulator to add items.</p>
                   </div>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="data-table-container" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                       <thead>
                         <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
@@ -1235,7 +1235,7 @@ function POS({ token, business, printerCharacteristic }) {
           {/* TAB 2: ITEM BILLING */}
           {activeTab === 'item' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flexGrow: 1 }}>
-              
+
               {/* Filter controls row */}
               <div style={{ display: 'flex', gap: '12px', background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #cbd5e1', alignItems: 'center' }}>
                 <div style={{ position: 'relative', flex: 1 }}>
@@ -1275,7 +1275,7 @@ function POS({ token, business, printerCharacteristic }) {
                       const isOutOfStock = p.stock <= 0;
 
                       return (
-                        <div 
+                        <div
                           key={p.id}
                           onClick={() => !isOutOfStock && handleAddToCart(p)}
                           style={{
@@ -1325,8 +1325,8 @@ function POS({ token, business, printerCharacteristic }) {
                                 </button>
                               </div>
                             ) : (
-                              <button 
-                                type="button" 
+                              <button
+                                type="button"
                                 onClick={(e) => { e.stopPropagation(); handleAddToCart(p); }}
                                 style={{ width: '100%', background: '#2563eb', border: 'none', color: '#ffffff', padding: '6px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                               >
@@ -1366,7 +1366,7 @@ function POS({ token, business, printerCharacteristic }) {
           {/* TAB 3: BILLING HISTORY */}
           {activeTab === 'history' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flexGrow: 1 }}>
-              
+
               {/* History Search bar */}
               <div style={{ display: 'flex', gap: '12px', background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e5e7eb', alignItems: 'center' }}>
                 <div style={{ position: 'relative', flex: 1 }}>
@@ -1379,8 +1379,8 @@ function POS({ token, business, printerCharacteristic }) {
                     style={{ paddingLeft: '36px', background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', padding: '8px 12px 8px 36px', width: '100%' }}
                   />
                 </div>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={fetchHistory}
                   style={{ background: 'none', border: '1px solid #cbd5e1', color: '#4b5563', padding: '8px 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
@@ -1400,7 +1400,7 @@ function POS({ token, business, printerCharacteristic }) {
                     <p style={{ fontSize: '0.82rem', fontWeight: 500 }}>No billing history found.</p>
                   </div>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="data-table-container" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                       <thead>
                         <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
@@ -1415,8 +1415,8 @@ function POS({ token, business, printerCharacteristic }) {
                       </thead>
                       <tbody>
                         {filteredHistory.map((inv) => {
-                          const dateVal = inv.createdAt?._seconds 
-                            ? new Date(inv.createdAt._seconds * 1000) 
+                          const dateVal = inv.createdAt?._seconds
+                            ? new Date(inv.createdAt._seconds * 1000)
                             : new Date(inv.createdAt);
                           const isOpen = inv.status === 'Open';
 
@@ -1482,8 +1482,8 @@ function POS({ token, business, printerCharacteristic }) {
 
         {/* Right Billing Details Side (Applicable for both Barcode & Item Billing tabs) */}
         {activeTab !== 'history' && (
-          <div style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
+          <div className="pos-sidebar-panel" style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
             {/* Customer Details block */}
             <div style={{ background: '#ffffff', borderRadius: '12px', padding: '24px', border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f3f4f6', paddingBottom: '10px' }}>
@@ -1510,7 +1510,7 @@ function POS({ token, business, printerCharacteristic }) {
                   }}>
                     {customerName ? customerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'C'}
                   </div>
-                  
+
                   {/* Selected customer attributes */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, paddingRight: '20px' }}>
                     <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#0f172a' }}>
@@ -1621,7 +1621,7 @@ function POS({ token, business, printerCharacteristic }) {
                           No matching customers found
                         </div>
                       )}
-                      
+
                       {/* Sticky Add Customer Button inside dropdown */}
                       <button
                         type="button"
@@ -1650,7 +1650,7 @@ function POS({ token, business, printerCharacteristic }) {
                 <span>Selected Items</span>
                 <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>({cart.length})</span>
               </h3>
-              
+
               {cart.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: '0.8rem' }}>
                   No items in cart
@@ -1665,22 +1665,22 @@ function POS({ token, business, printerCharacteristic }) {
                           ₹{((item.price * item.quantity) + (((item.price * item.quantity) * (business.gstEnabled ? Number(business.gstPercentage || 0) : 0)) / 100)).toFixed(2)}
                         </span>
                       </div>
-                      
+
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>
                           ₹{Number(item.price).toFixed(2)} each
                         </span>
-                        
+
                         {/* Plus / Minus / Input Controls */}
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <button 
+                          <button
                             type="button"
-                            onClick={() => handleUpdateQty(item.productId, item.quantity - 1)} 
+                            onClick={() => handleUpdateQty(item.productId, item.quantity - 1)}
                             style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '4px', cursor: 'pointer', color: '#4b5563', padding: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           >
                             <Minus size={10} />
                           </button>
-                          
+
                           <input
                             type="number"
                             min="1"
@@ -1701,16 +1701,16 @@ function POS({ token, business, printerCharacteristic }) {
                               height: '22px'
                             }}
                           />
-                          
-                          <button 
+
+                          <button
                             type="button"
-                            onClick={() => handleUpdateQty(item.productId, item.quantity + 1)} 
+                            onClick={() => handleUpdateQty(item.productId, item.quantity + 1)}
                             style={{ border: '1px solid #cbd5e1', background: '#ffffff', borderRadius: '4px', cursor: 'pointer', color: '#4b5563', padding: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           >
                             <Plus size={10} />
                           </button>
-                          
-                          <button 
+
+                          <button
                             type="button"
                             onClick={() => handleRemoveFromCart(item.productId)}
                             style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px', marginLeft: '4px', display: 'flex', alignItems: 'center' }}
@@ -1925,14 +1925,14 @@ function POS({ token, business, printerCharacteristic }) {
                 ✕
               </button>
             </div>
- 
+
             {/* Print Friendly Format with scrolling items list inside */}
             <div className="receipt-wrapper" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', overflowY: 'auto', flexGrow: 1, minHeight: 0 }}>
               <div style={{ textAlign: 'center', borderBottom: '1px dashed #cbd5e1', paddingBottom: '10px', marginBottom: '10px' }}>
                 <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0, color: '#0f172a' }}>{business.name}</h2>
                 <p style={{ fontSize: '0.7rem', color: '#64748b', margin: '4px 0 0 0' }}>{business.address}</p>
               </div>
- 
+
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#475569', marginBottom: '4px' }}>
                 <span>Bill No: <strong>{checkoutInvoice.invoiceNumber}</strong></span>
                 <span>Date: {new Date(checkoutInvoice.createdAt?._seconds ? checkoutInvoice.createdAt._seconds * 1000 : checkoutInvoice.createdAt).toLocaleDateString()}</span>
@@ -1941,9 +1941,9 @@ function POS({ token, business, printerCharacteristic }) {
                 <span>Customer: {checkoutInvoice.customerName}</span>
                 <span>{checkoutInvoice.customerPhone && `Mob: ${checkoutInvoice.customerPhone}`}</span>
               </div>
- 
+
               <div style={{ borderTop: '1px dashed #cbd5e1', margin: '8px 0' }}></div>
- 
+
               {/* Items List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {checkoutInvoice.items?.map((item, idx) => (
@@ -1959,9 +1959,9 @@ function POS({ token, business, printerCharacteristic }) {
                   </div>
                 ))}
               </div>
- 
+
               <div style={{ borderTop: '1px dashed #cbd5e1', margin: '10px 0' }}></div>
- 
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.75rem', color: '#475569' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Subtotal:</span>
@@ -1978,43 +1978,43 @@ function POS({ token, business, printerCharacteristic }) {
                   </div>
                 )}
               </div>
- 
+
               <div style={{ borderTop: '1px dashed #cbd5e1', margin: '10px 0' }}></div>
- 
+
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 600, color: '#0f172a' }}>
                 <span>GRAND TOTAL:</span>
                 <span>₹{checkoutInvoice.grandTotal?.toFixed(2)}</span>
               </div>
- 
+
               <div style={{ borderTop: '1px dashed #cbd5e1', margin: '8px 0' }}></div>
               <div style={{ display: 'flex', justifyContent: 'center', fontSize: '0.7rem', color: '#475569', fontWeight: 600 }}>
                 Status: {checkoutInvoice.status === 'Open' ? 'UNSETTLED (OPEN)' : `PAID via ${checkoutInvoice.paymentMethod}`}
               </div>
             </div>
- 
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', flexShrink: 0 }}>
               {printerCharacteristic ? (
-                <button 
-                  type="button" 
-                  className="btn btn-success" 
+                <button
+                  type="button"
+                  className="btn btn-success"
                   style={{ background: '#10b981', color: '#ffffff', border: 'none', fontSize: '0.8rem', padding: '8px 14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
                   onClick={() => handleThermalPrintReceipt(checkoutInvoice)}
                 >
                   <Printer size={12} /> Print Thermal
                 </button>
               ) : (
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
+                <button
+                  type="button"
+                  className="btn btn-secondary"
                   style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: '0.8rem', padding: '8px 14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
                   onClick={() => alert("Please connect the Bluetooth printer from the top bar first.")}
                 >
                   <Printer size={12} /> Print Thermal (Disconnected)
                 </button>
               )}
-              <button 
-                type="button" 
-                className="btn btn-success" 
+              <button
+                type="button"
+                className="btn btn-success"
                 style={{ background: '#2563eb', border: 'none', color: '#ffffff', fontSize: '0.8rem', padding: '8px 14px', cursor: 'pointer' }}
                 onClick={() => setCheckoutInvoice(null)}
               >

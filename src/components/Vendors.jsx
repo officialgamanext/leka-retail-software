@@ -574,7 +574,7 @@ export default function Vendors({ token, business }) {
       {/* Screen Layout Wrapper */}
       <div className="no-print">
         {/* Page Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div className="page-header-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a' }}>Vendor & Purchase Orders</h2>
             <p style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '2px' }}>
@@ -611,7 +611,7 @@ export default function Vendors({ token, business }) {
         )}
 
         {/* Stats Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '24px' }}>
+        <div className="stats-grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '24px' }}>
           {[
             { label: 'Total Vendors', value: totalVendors, desc: 'Active supplier profiles', color: '#fbbf24', bg: '#fffbeb', icon: <Truck size={20} /> },
             { label: 'Total Orders Created', value: totalOrders, desc: 'Overall worksheets generated', color: '#2563eb', bg: '#eff6ff', icon: <ShoppingBag size={20} /> },
@@ -631,7 +631,7 @@ export default function Vendors({ token, business }) {
         </div>
 
         {/* Navigation Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: '20px', gap: '4px' }}>
+        <div className="navigation-tabs-container" style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: '20px', gap: '4px' }}>
           <button
             onClick={() => setActiveTab('orders')}
             style={{
@@ -674,7 +674,7 @@ export default function Vendors({ token, business }) {
         {activeTab === 'orders' && (
           <div>
             {/* Search Bar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div className="search-filter-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ position: 'relative', flex: 1, maxWidth: '450px' }}>
                 <Search size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
                 <input
@@ -698,7 +698,7 @@ export default function Vendors({ token, business }) {
                 <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>Get started by creating a new purchase order sheet.</p>
               </div>
             ) : (
-              <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+              <div className="data-table-container" style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
@@ -778,7 +778,7 @@ export default function Vendors({ token, business }) {
         {activeTab === 'vendors' && (
           <div>
             {/* Search Bar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div className="search-filter-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ position: 'relative', flex: 1, maxWidth: '450px' }}>
                 <Search size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
                 <input
@@ -802,7 +802,7 @@ export default function Vendors({ token, business }) {
                 <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>Add your first vendor details to start procurement.</p>
               </div>
             ) : (
-              <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+              <div className="data-table-container" style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
@@ -975,7 +975,7 @@ export default function Vendors({ token, business }) {
           fontFamily: 'Inter, system-ui, sans-serif'
         }}>
           {/* Modal Header */}
-          <div style={{
+          <div className="po-modal-header" style={{
             background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '16px 24px',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '70px',
             boxSizing: 'border-box'
@@ -1036,9 +1036,9 @@ export default function Vendors({ token, business }) {
           </div>
 
           {/* Modal Body */}
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          <div className="po-modal-body" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
             {/* Left Column: Product Directory */}
-            <div style={{ width: '60%', display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '24px', borderRight: '1px solid #e2e8f0', boxSizing: 'border-box' }}>
+            <div className="po-modal-left-panel" style={{ width: '60%', display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '24px', borderRight: '1px solid #e2e8f0', boxSizing: 'border-box' }}>
               {/* Product Filtering Toolbar */}
               <div style={{ display: 'flex', gap: '12px', marginBottom: '18px' }}>
                 <div style={{ position: 'relative', flex: 1 }}>
@@ -1123,7 +1123,7 @@ export default function Vendors({ token, business }) {
             </div>
 
             {/* Right Column: Ordered Items List & Summary */}
-            <div style={{ width: '40%', display: 'flex', flexDirection: 'column', background: '#ffffff', boxSizing: 'border-box' }}>
+            <div className="po-modal-right-panel" style={{ width: '40%', display: 'flex', flexDirection: 'column', background: '#ffffff', boxSizing: 'border-box' }}>
               <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
                   PO Worksheet Items ({selectedItems.length})
@@ -1281,7 +1281,7 @@ export default function Vendors({ token, business }) {
               </div>
 
               {/* Worksheet table (No Prices, display Qty and Stock Receive action) */}
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+              <div className="data-table-container" style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
