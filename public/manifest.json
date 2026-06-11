@@ -1,0 +1,27 @@
+{
+  "name": "Leka Retail",
+  "short_name": "Leka Retail",
+  "description": "Smart Billing and POS Suite for Retail Businesses",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090b11",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

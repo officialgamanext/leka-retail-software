@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   ShoppingCart,
@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   Loader2,
   ArrowRight,
-  EyeOff
+  EyeOff,
+  Download
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -22,6 +23,47 @@ function Login({ onLoginSuccess, securityMessage }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // PWA Install States & Handlers
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+
+  useEffect(() => {
+    // Check if already running in standalone mode (installed app)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (isStandalone) {
+      setShowInstallBtn(false);
+      return;
+    }
+
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBtn(true);
+    };
+
+    const handleAppInstalled = () => {
+      setDeferredPrompt(null);
+      setShowInstallBtn(false);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    setDeferredPrompt(null);
+    setShowInstallBtn(false);
+  };
 
   // Normalize and validate mobile numbers
   const formatPhoneNumber = (number) => {
@@ -410,6 +452,35 @@ function Login({ onLoginSuccess, securityMessage }) {
                   Change Mobile Number
                 </button>
               </form>
+            )}
+
+            {showInstallBtn && (
+              <button
+                type="button"
+                className="btn-pwa-install"
+                onClick={handleInstallClick}
+                style={{
+                  width: '100%',
+                  marginTop: '16px',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
+                  transition: 'all 0.2s ease',
+                  fontFamily: 'inherit'
+                }}
+              >
+                <Download size={16} /> Install App
+              </button>
             )}
 
             <div className="security-badge-footer">
