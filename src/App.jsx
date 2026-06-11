@@ -40,6 +40,7 @@ function App() {
   // ─── Logout helper (used by interceptor + UI) ──────────────────────────────
   const handleLogout = useCallback((message = '') => {
     localStorage.removeItem('leka_token');
+    localStorage.removeItem('leka_refresh_token');
     localStorage.removeItem('leka_business');
     setToken(null);
     setUser(null);
@@ -67,14 +68,77 @@ function App() {
       return config;
     });
 
+    let isRefreshing = false;
+    let failedQueue = [];
+
+    const processQueue = (error, token = null) => {
+      failedQueue.forEach((prom) => {
+        if (error) {
+          prom.reject(error);
+        } else {
+          prom.resolve(token);
+        }
+      });
+      failedQueue = [];
+    };
+
     // Response interceptor — handle auth/subscription failures globally
     const resInterceptor = api.interceptors.response.use(
       (response) => response,
-      (error) => {
+      async (error) => {
+        const originalRequest = error.config;
         const status = error?.response?.status;
-        if (status === 401) {
-          // Token invalid or expired → full logout
-          handleLogout('Your session has expired. Please log in again.');
+
+        if (status === 401 && !originalRequest._retry) {
+          if (isRefreshing) {
+            return new Promise((resolve, reject) => {
+              failedQueue.push({ resolve, reject });
+            })
+              .then((newToken) => {
+                originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+                return api(originalRequest);
+              })
+              .catch((err) => Promise.reject(err));
+          }
+
+          originalRequest._retry = true;
+          isRefreshing = true;
+
+          const storedRefreshToken = localStorage.getItem('leka_refresh_token');
+          if (storedRefreshToken) {
+            try {
+              const refreshRes = await axios.post(`${API_URL}/auth/refresh`, {
+                refreshToken: storedRefreshToken
+              });
+
+              if (refreshRes.data.success && refreshRes.data.token) {
+                const newToken = refreshRes.data.token;
+                const newRefreshToken = refreshRes.data.refreshToken;
+
+                localStorage.setItem('leka_token', newToken);
+                if (newRefreshToken) {
+                  localStorage.setItem('leka_refresh_token', newRefreshToken);
+                }
+                setToken(newToken);
+
+                api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+                originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+
+                processQueue(null, newToken);
+                isRefreshing = false;
+
+                return api(originalRequest);
+              }
+            } catch (refreshError) {
+              processQueue(refreshError, null);
+              isRefreshing = false;
+              handleLogout('Your session has expired. Please log in again.');
+              return Promise.reject(refreshError);
+            }
+          } else {
+            isRefreshing = false;
+            handleLogout('Your session has expired. Please log in again.');
+          }
         } else if (status === 403) {
           // Subscription expired or business access revoked → go back to onboarding
           handleSwitchBusiness('Access denied. Your business subscription may have expired.');
@@ -100,16 +164,15 @@ function App() {
 
       try {
         // Step 1 — Verify token is still valid with the API
-        const meRes = await api.get('/auth/me', {
-          headers: { Authorization: `Bearer ${storedToken}` }
-        });
+        const meRes = await api.get('/auth/me');
 
         if (!meRes.data.success) {
           handleLogout('Session invalid. Please log in again.');
           return;
         }
 
-        setToken(storedToken);
+        const activeToken = localStorage.getItem('leka_token');
+        setToken(activeToken);
         setUser(meRes.data.user);
 
         // Step 2 — If a business was previously selected, re-validate it against live API data
@@ -121,9 +184,7 @@ function App() {
             return;
           }
 
-          const bizRes = await api.get('/businesses', {
-            headers: { Authorization: `Bearer ${storedToken}` }
-          });
+          const bizRes = await api.get('/businesses');
 
           const liveBiz = bizRes.data.businesses?.find(b => b.id === savedBiz.id);
 
@@ -170,9 +231,12 @@ function App() {
   }, []); // Only on mount — interceptors handle mid-session events
 
   // ─── Handlers passed down to children ─────────────────────────────────────
-  const handleLoginSuccess = (userToken, userData) => {
+  const handleLoginSuccess = (userToken, userRefreshToken, userData) => {
     setSecurityMessage('');
     localStorage.setItem('leka_token', userToken);
+    if (userRefreshToken) {
+      localStorage.setItem('leka_refresh_token', userRefreshToken);
+    }
     setUser(userData);
     setToken(userToken);
     navigate('/onboarding');

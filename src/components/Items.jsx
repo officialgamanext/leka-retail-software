@@ -31,9 +31,11 @@ async function bleWrite(characteristic, data) {
 }
 
 // ─── Raster Barcode Printer ───────────────────────────────────────────────────
-// Renders the barcode with JsBarcode (same as the displayed image) into a
-// canvas, then sends it to the thermal printer as a raster bitmap via
-// ESC/POS GS v 0 command. This guarantees the EXACT barcode is printed.
+// Renders the barcode with JsBarcode into a canvas scaled to the printer's full
+// paper width, then sends it as a raster bitmap via ESC/POS GS v 0.
+// PAPER_WIDTH_PX: 384 = 58mm paper, 576 = 80mm paper (both at 203 DPI)
+const PAPER_WIDTH_PX = 576;
+
 async function printBarcodeLabel(characteristic, item) {
   const barcodeData = (item.barcode || '').trim();
   if (!barcodeData) {
@@ -41,55 +43,59 @@ async function printBarcodeLabel(characteristic, item) {
     return;
   }
 
-  // ── 1. Render barcode to canvas ──
-  const canvas = document.createElement('canvas');
-  JsBarcode(canvas, barcodeData, {
+  // ── 1. Render barcode to a temp canvas at normal size ──
+  const tmpCanvas = document.createElement('canvas');
+  JsBarcode(tmpCanvas, barcodeData, {
     format:       'CODE128',
-    width:        2,
-    height:       70,
+    width:        3,
+    height:       80,
     displayValue: true,
-    fontSize:     14,
-    margin:       8,
+    fontSize:     16,
+    margin:       6,
     background:   '#ffffff',
     lineColor:    '#000000'
   });
 
-  // Snap canvas width to a multiple of 8 (required by ESC/POS raster format)
-  const srcW = canvas.width;
-  const srcH = canvas.height;
-  const byteW = Math.ceil(srcW / 8);   // bytes per row
-  const printW = byteW * 8;            // actual pixel width (padded)
+  // ── 2. Scale to full paper width ──
+  // byteW must be a multiple of 8 for ESC/POS raster format
+  const targetW  = Math.floor(PAPER_WIDTH_PX / 8) * 8; // snap to multiple of 8
+  const scale    = targetW / tmpCanvas.width;
+  const targetH  = Math.round(tmpCanvas.height * scale);
 
-  // ── 2. Read pixel data ──
+  const canvas = document.createElement('canvas');
+  canvas.width  = targetW;
+  canvas.height = targetH;
   const ctx = canvas.getContext('2d');
-  const imgData = ctx.getImageData(0, 0, srcW, srcH);
-  const pixels = imgData.data; // RGBA, 4 bytes per pixel
+  ctx.imageSmoothingEnabled = false; // keep crisp bar edges
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, targetW, targetH);
+  ctx.drawImage(tmpCanvas, 0, 0, targetW, targetH);
 
-  // ── 3. Convert to 1-bit monochrome bitmap ──
+  // ── 3. Read pixel data from the scaled canvas ──
+  const imgData = ctx.getImageData(0, 0, targetW, targetH);
+  const pixels  = imgData.data; // RGBA, 4 bytes per pixel
+  const byteW   = targetW / 8; // bytes per raster row
+
+  // ── 4. Convert to 1-bit monochrome bitmap ──
   // ESC/POS raster: 1 = black dot, 0 = white, MSB first per byte
   const rasterRows = [];
-  for (let row = 0; row < srcH; row++) {
+  for (let row = 0; row < targetH; row++) {
     const rowBytes = [];
     for (let byteIdx = 0; byteIdx < byteW; byteIdx++) {
       let b = 0;
       for (let bit = 0; bit < 8; bit++) {
         const col = byteIdx * 8 + bit;
-        let pixel = 0; // white (outside canvas = white)
-        if (col < srcW) {
-          const idx = (row * srcW + col) * 4;
-          // Average RGB; < 128 = dark = black dot
-          const grey = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3;
-          pixel = grey < 128 ? 1 : 0;
-        }
-        b = (b << 1) | pixel;
+        const idx  = (row * targetW + col) * 4;
+        const grey = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3;
+        b = (b << 1) | (grey < 128 ? 1 : 0);
       }
       rowBytes.push(b);
     }
     rasterRows.push(rowBytes);
   }
 
-  // ── 4. Build ESC/POS command sequence ──
-  const enc = new TextEncoder();
+  // ── 5. Build ESC/POS command sequence ──
+  const enc  = new TextEncoder();
   const cmds = [];
 
   // ESC @ — initialize printer
@@ -98,24 +104,23 @@ async function printBarcodeLabel(characteristic, item) {
   // ESC a 1 — center align
   cmds.push(0x1B, 0x61, 0x01);
 
-  // ESC E 1 — bold on
+  // ESC E 1 — bold on, print product name, bold off
   cmds.push(0x1B, 0x45, 0x01);
   cmds.push(...enc.encode(item.name + '\n'));
-  // ESC E 0 — bold off
   cmds.push(0x1B, 0x45, 0x00);
 
   // Print price
   cmds.push(...enc.encode(`Rs.${Number(item.price).toFixed(2)}\n`));
 
-  // GS v 0 — raster bit image
+  // GS v 0 — raster bit image (full-width barcode)
   // Format: 1D 76 30 m xL xH yL yH d1...dk
-  //   m = 0 (normal density)
-  //   xL/xH = byteW (columns / 8) LSB/MSB
-  //   yL/yH = srcH (rows) LSB/MSB
+  //   m  = 0  (normal density, 1 pixel = 1 dot)
+  //   xL/xH = byteW (bytes per row) as LSB/MSB
+  //   yL/yH = targetH (rows) as LSB/MSB
   const xL = byteW & 0xFF;
   const xH = (byteW >> 8) & 0xFF;
-  const yL = srcH & 0xFF;
-  const yH = (srcH >> 8) & 0xFF;
+  const yL = targetH & 0xFF;
+  const yH = (targetH >> 8) & 0xFF;
   cmds.push(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH);
   for (const row of rasterRows) {
     cmds.push(...row);
@@ -124,7 +129,7 @@ async function printBarcodeLabel(characteristic, item) {
   // ESC d 4 — feed 4 lines
   cmds.push(0x1B, 0x64, 0x04);
 
-  // ── 5. Send to printer via BLE ──
+  // ── 6. Send to printer via BLE ──
   await bleWrite(characteristic, new Uint8Array(cmds));
 }
 

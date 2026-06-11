@@ -137,7 +137,7 @@ function Login({ onLoginSuccess, securityMessage }) {
       });
 
       if (response.data.success && response.data.token) {
-        onLoginSuccess(response.data.token, response.data.user);
+        onLoginSuccess(response.data.token, response.data.refreshToken, response.data.user);
       } else {
         setError('Verification failed. Invalid code.');
       }
