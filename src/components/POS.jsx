@@ -1268,7 +1268,7 @@ function POS({ token, business, printerCharacteristic }) {
                     <p style={{ fontWeight: 500 }}>No products found matching criteria</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
+                  <div className="pos-products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
                     {filteredProducts.map(p => {
                       const cartItem = cart.find(item => item.productId === p.id);
                       const isAdded = !!cartItem;
@@ -1278,15 +1278,16 @@ function POS({ token, business, printerCharacteristic }) {
                         <div
                           key={p.id}
                           onClick={() => !isOutOfStock && handleAddToCart(p)}
+                          className="pos-product-card"
                           style={{
                             background: '#ffffff', border: isAdded ? '2px solid #2563eb' : '1px solid #e5e7eb',
-                            borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px',
+                            borderRadius: '12px', display: 'flex', flexDirection: 'column',
                             transition: 'all 0.2s ease', position: 'relative', opacity: isOutOfStock ? 0.6 : 1,
                             cursor: isOutOfStock ? 'not-allowed' : 'pointer'
                           }}
                         >
                           {/* Image Placeholder */}
-                          <div style={{ width: '100%', height: '80px', borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                          <div className="pos-prod-img-wrapper" style={{ width: '100%', height: '80px', borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                             {p.imageUrl ? (
                               <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
@@ -1295,13 +1296,13 @@ function POS({ token, business, printerCharacteristic }) {
                           </div>
 
                           <div>
-                            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1f2937', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '2.4em', lineHeight: '1.2' }}>
+                            <div className="pos-prod-name" style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1f2937', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '2.4em', lineHeight: '1.2' }}>
                               {p.name}
                             </div>
                             <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>{p.categoryName || 'General'}</span>
                           </div>
 
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                          <div className="pos-prod-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
                             <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>₹{Number(p.price).toFixed(2)}</span>
                             <span style={{ fontSize: '0.7rem', color: p.stock <= 5 ? '#ef4444' : '#6b7280', fontWeight: 500 }}>
                               {isOutOfStock ? 'No Stock' : `Qty: ${p.stock}`}
@@ -1311,15 +1312,15 @@ function POS({ token, business, printerCharacteristic }) {
                           {/* Add/Plus/Minus buttons overlay */}
                           <div style={{ marginTop: '4px' }}>
                             {isOutOfStock ? (
-                              <button disabled style={{ width: '100%', background: '#cbd5e1', border: 'none', color: '#ffffff', padding: '6px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'not-allowed', fontWeight: 600 }}>
-                                Out of Stock
+                              <button className="pos-prod-add-btn oos" disabled style={{ width: '100%', background: '#cbd5e1', border: 'none', color: '#ffffff', padding: '6px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'not-allowed', fontWeight: 600 }}>
+                                <span>Out of Stock</span>
                               </button>
                             ) : isAdded ? (
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '4px' }}>
+                              <div className="pos-prod-qty-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '4px' }}>
                                 <button type="button" onClick={(e) => { e.stopPropagation(); handleUpdateQty(p.id, cartItem.quantity - 1); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px', display: 'flex' }}>
                                   <Minus size={12} />
                                 </button>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#2563eb' }}>{cartItem.quantity} selected</span>
+                                <span className="pos-prod-qty-badge" style={{ fontSize: '0.75rem', fontWeight: 600, color: '#2563eb' }}>{cartItem.quantity}</span>
                                 <button type="button" onClick={(e) => { e.stopPropagation(); handleUpdateQty(p.id, cartItem.quantity + 1); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px', display: 'flex' }}>
                                   <Plus size={12} />
                                 </button>
@@ -1328,9 +1329,10 @@ function POS({ token, business, printerCharacteristic }) {
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); handleAddToCart(p); }}
+                                className="pos-prod-add-btn"
                                 style={{ width: '100%', background: '#2563eb', border: 'none', color: '#ffffff', padding: '6px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                               >
-                                <Plus size={11} /> Select Item
+                                <Plus size={11} /> <span>Select Item</span>
                               </button>
                             )}
                           </div>

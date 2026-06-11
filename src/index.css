@@ -2437,3 +2437,67 @@ label {
     max-height: unset !important;
   }
 }
+
+/* POS Product Item Cards responsiveness (3-column layout on mobile) */
+.pos-product-card {
+  padding: 14px;
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .pos-products-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+  }
+  .pos-product-card {
+    padding: 8px !important;
+    gap: 6px !important;
+    border-radius: 8px !important;
+  }
+  .pos-prod-img-wrapper {
+    height: 55px !important; /* Make image placeholder shorter to save vertical space */
+  }
+  .pos-prod-img-wrapper svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .pos-prod-name {
+    font-size: 0.7rem !important;
+    line-height: 1.1 !important;
+    height: 2.2em !important;
+  }
+  .pos-product-card span {
+    font-size: 0.62rem !important; /* category tag & other labels */
+  }
+  .pos-prod-meta {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 2px !important;
+  }
+  .pos-prod-meta span:first-child {
+    font-size: 0.78rem !important; /* Price tag */
+  }
+  .pos-prod-meta span:last-child {
+    font-size: 0.6rem !important; /* Stock qty label */
+  }
+  .pos-prod-add-btn {
+    padding: 4px 6px !important;
+    font-size: 0.65rem !important;
+  }
+  .pos-prod-add-btn span {
+    display: none !important; /* Hide 'Select Item' text on mobile */
+  }
+  .pos-prod-add-btn.oos span {
+    display: none !important;
+  }
+  .pos-prod-add-btn.oos::before {
+    content: "OOS" !important;
+    font-size: 0.6rem !important;
+  }
+  .pos-prod-qty-wrapper {
+    padding: 2px 4px !important;
+  }
+  .pos-prod-qty-badge {
+    font-size: 0.7rem !important;
+  }
+}

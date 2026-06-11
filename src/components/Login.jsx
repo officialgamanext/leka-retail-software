@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { 
-  ShoppingCart, 
-  ReceiptText, 
-  Package, 
-  BarChart3, 
-  Globe, 
-  Lock, 
-  ShieldCheck, 
-  Loader2, 
+import {
+  ShoppingCart,
+  ReceiptText,
+  Package,
+  BarChart3,
+  Globe,
+  Lock,
+  ShieldCheck,
+  Loader2,
   ArrowRight,
   EyeOff
 } from 'lucide-react';
@@ -295,7 +295,7 @@ function Login({ onLoginSuccess, securityMessage }) {
                   <label htmlFor="mobile" style={{ color: '#4b5563', fontSize: '0.82rem', fontWeight: 600 }}>
                     Enter your mobile number
                   </label>
-                  
+
                   {/* Custom Indian Mobile Format input wrapper */}
                   <div className="phone-input-container">
                     <div className="country-select-box">
@@ -325,7 +325,7 @@ function Login({ onLoginSuccess, securityMessage }) {
                       required
                     />
                   </div>
-                  
+
                   <div className="form-info-prompt">
                     <Lock size={12} />
                     <span>We'll send you a 6-digit OTP on this number</span>
@@ -342,11 +342,11 @@ function Login({ onLoginSuccess, securityMessage }) {
                   )}
                 </button>
 
-                <div className="or-divider">OR</div>
+                {/* <div className="or-divider">OR</div>
 
                 <button type="button" className="btn-password-outline" disabled={loading}>
                   <Lock size={14} /> Continue with Password
-                </button>
+                </button> */}
               </form>
             ) : (
               <form onSubmit={handleVerifyOTP} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
@@ -354,7 +354,7 @@ function Login({ onLoginSuccess, securityMessage }) {
                   <label htmlFor="verificationCode" style={{ color: '#4b5563', fontSize: '0.82rem', fontWeight: 600 }}>
                     Enter 6-digit verification code
                   </label>
-                  
+
                   <input
                     id="verificationCode"
                     type="text"
@@ -363,12 +363,12 @@ function Login({ onLoginSuccess, securityMessage }) {
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                     disabled={loading}
                     maxLength={6}
-                    style={{ 
-                      marginTop: '8px', 
-                      padding: '12px', 
-                      fontSize: '1.2rem', 
-                      textAlign: 'center', 
-                      letterSpacing: '8px', 
+                    style={{
+                      marginTop: '8px',
+                      padding: '12px',
+                      fontSize: '1.2rem',
+                      textAlign: 'center',
+                      letterSpacing: '8px',
                       fontWeight: 'bold',
                       color: '#1f2937',
                       background: '#ffffff',
@@ -380,9 +380,9 @@ function Login({ onLoginSuccess, securityMessage }) {
 
                   <div className="form-info-prompt" style={{ justifyContent: 'center', marginTop: '14px' }}>
                     <span>Didn't receive code?</span>
-                    <button 
-                      type="button" 
-                      onClick={handleSendOTP} 
+                    <button
+                      type="button"
+                      onClick={handleSendOTP}
                       disabled={loading}
                       style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 600, cursor: 'pointer', fontSize: '0.78rem' }}
                     >
@@ -401,9 +401,9 @@ function Login({ onLoginSuccess, securityMessage }) {
                   )}
                 </button>
 
-                <button 
-                  type="button" 
-                  className="btn-password-outline" 
+                <button
+                  type="button"
+                  className="btn-password-outline"
                   onClick={() => { setStep(1); setError(''); setSuccess(''); }}
                   disabled={loading}
                 >
