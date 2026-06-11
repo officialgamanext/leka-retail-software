@@ -27,6 +27,7 @@ import DashboardPage from './DashboardPage';
 import Expenses from './Expenses';
 import StaffPage from './StaffPage';
 import StockAnalysis from './StockAnalysis';
+import Vendors from './Vendors';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -348,6 +349,8 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
         );
       case 'customers':
         return renderPageWithBreadcrumb('Customer', <Customers token={token} business={business} />);
+      case 'vendors':
+        return renderPageWithBreadcrumb('Vendors', <Vendors token={token} business={business} />);
       case 'expenses':
         return renderPageWithBreadcrumb('Expenses', <Expenses token={token} business={business} />);
       case 'staff':
