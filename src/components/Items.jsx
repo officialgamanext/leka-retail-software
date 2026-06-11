@@ -10,6 +10,124 @@ import {
 const API_URL = import.meta.env.VITE_API_URL;
 const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=400&auto=format&fit=crop&q=60';
 
+// ─── BLE Write Helper ─────────────────────────────────────────────────────────
+// Automatically uses writeValueWithoutResponse if the characteristic doesn't
+// support acknowledged writes. Sends data in 128-byte chunks with a 15ms gap.
+async function bleWrite(characteristic, data) {
+  const useNoResponse = !characteristic.properties.write &&
+                         characteristic.properties.writeWithoutResponse;
+  const chunkSize = 128;
+  for (let offset = 0; offset < data.length; offset += chunkSize) {
+    const chunk = data.slice(offset, offset + chunkSize);
+    if (useNoResponse) {
+      await characteristic.writeValueWithoutResponse(chunk);
+    } else {
+      await characteristic.writeValue(chunk);
+    }
+    if (offset + chunkSize < data.length) {
+      await new Promise(r => setTimeout(r, 15));
+    }
+  }
+}
+
+// ─── Raster Barcode Printer ───────────────────────────────────────────────────
+// Renders the barcode with JsBarcode (same as the displayed image) into a
+// canvas, then sends it to the thermal printer as a raster bitmap via
+// ESC/POS GS v 0 command. This guarantees the EXACT barcode is printed.
+async function printBarcodeLabel(characteristic, item) {
+  const barcodeData = (item.barcode || '').trim();
+  if (!barcodeData) {
+    alert('This item does not have a barcode to print.');
+    return;
+  }
+
+  // ── 1. Render barcode to canvas ──
+  const canvas = document.createElement('canvas');
+  JsBarcode(canvas, barcodeData, {
+    format:       'CODE128',
+    width:        2,
+    height:       70,
+    displayValue: true,
+    fontSize:     14,
+    margin:       8,
+    background:   '#ffffff',
+    lineColor:    '#000000'
+  });
+
+  // Snap canvas width to a multiple of 8 (required by ESC/POS raster format)
+  const srcW = canvas.width;
+  const srcH = canvas.height;
+  const byteW = Math.ceil(srcW / 8);   // bytes per row
+  const printW = byteW * 8;            // actual pixel width (padded)
+
+  // ── 2. Read pixel data ──
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.getImageData(0, 0, srcW, srcH);
+  const pixels = imgData.data; // RGBA, 4 bytes per pixel
+
+  // ── 3. Convert to 1-bit monochrome bitmap ──
+  // ESC/POS raster: 1 = black dot, 0 = white, MSB first per byte
+  const rasterRows = [];
+  for (let row = 0; row < srcH; row++) {
+    const rowBytes = [];
+    for (let byteIdx = 0; byteIdx < byteW; byteIdx++) {
+      let b = 0;
+      for (let bit = 0; bit < 8; bit++) {
+        const col = byteIdx * 8 + bit;
+        let pixel = 0; // white (outside canvas = white)
+        if (col < srcW) {
+          const idx = (row * srcW + col) * 4;
+          // Average RGB; < 128 = dark = black dot
+          const grey = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3;
+          pixel = grey < 128 ? 1 : 0;
+        }
+        b = (b << 1) | pixel;
+      }
+      rowBytes.push(b);
+    }
+    rasterRows.push(rowBytes);
+  }
+
+  // ── 4. Build ESC/POS command sequence ──
+  const enc = new TextEncoder();
+  const cmds = [];
+
+  // ESC @ — initialize printer
+  cmds.push(0x1B, 0x40);
+
+  // ESC a 1 — center align
+  cmds.push(0x1B, 0x61, 0x01);
+
+  // ESC E 1 — bold on
+  cmds.push(0x1B, 0x45, 0x01);
+  cmds.push(...enc.encode(item.name + '\n'));
+  // ESC E 0 — bold off
+  cmds.push(0x1B, 0x45, 0x00);
+
+  // Print price
+  cmds.push(...enc.encode(`Rs.${Number(item.price).toFixed(2)}\n`));
+
+  // GS v 0 — raster bit image
+  // Format: 1D 76 30 m xL xH yL yH d1...dk
+  //   m = 0 (normal density)
+  //   xL/xH = byteW (columns / 8) LSB/MSB
+  //   yL/yH = srcH (rows) LSB/MSB
+  const xL = byteW & 0xFF;
+  const xH = (byteW >> 8) & 0xFF;
+  const yL = srcH & 0xFF;
+  const yH = (srcH >> 8) & 0xFF;
+  cmds.push(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH);
+  for (const row of rasterRows) {
+    cmds.push(...row);
+  }
+
+  // ESC d 4 — feed 4 lines
+  cmds.push(0x1B, 0x64, 0x04);
+
+  // ── 5. Send to printer via BLE ──
+  await bleWrite(characteristic, new Uint8Array(cmds));
+}
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function generateBarcodeValue() {
   // 12-digit numeric barcode (EAN-12 compatible, scannable in any POS)
@@ -657,55 +775,11 @@ function Items({ token, business, printerCharacteristic, printerDevice }) {
 
   const handlePrintBarcode = async (item) => {
     if (!printerCharacteristic) {
-      alert("Please connect the Bluetooth Thermal Printer first using the button in the header.");
+      alert('Please connect the Bluetooth Thermal Printer first.');
       return;
     }
-
     try {
-      const barcodeData = item.barcode;
-      if (!barcodeData) {
-        alert("This item does not have a barcode to print.");
-        return;
-      }
-
-      const encoder = new TextEncoder();
-      const commands = [];
-
-      // Initialize printer (ESC @)
-      commands.push(0x1B, 0x40);
-
-      // Center align (ESC a 1)
-      commands.push(0x1B, 0x61, 0x01);
-
-      // Print product name
-      const nameBytes = encoder.encode(`${item.name}\n`);
-      commands.push(...nameBytes);
-
-      // Set barcode height to 80 dots (GS h 80)
-      commands.push(0x1D, 0x68, 0x50);
-
-      // Set barcode width (GS w 2)
-      commands.push(0x1D, 0x77, 0x02);
-
-      // Set HRI characters position below barcode (GS H 2)
-      commands.push(0x1D, 0x48, 0x02);
-
-      // Print barcode (Code 128 System B)
-      const barcodeBytes = encoder.encode(barcodeData);
-      const length = barcodeBytes.length + 2; // +2 for subset selectors
-      commands.push(0x1D, 0x6B, 0x49, length, 0x7B, 0x42, ...barcodeBytes);
-
-      // Feed paper 3 lines (ESC d 3)
-      commands.push(0x1B, 0x64, 0x03);
-
-      const data = new Uint8Array(commands);
-      
-      // Chunk write in 20-byte payloads to fit standard BLE GATT MTU limitations
-      const chunkSize = 20;
-      for (let offset = 0; offset < data.length; offset += chunkSize) {
-        const chunk = data.slice(offset, offset + chunkSize);
-        await printerCharacteristic.writeValue(chunk);
-      }
+      await printBarcodeLabel(printerCharacteristic, item);
     } catch (err) {
       alert(`Printing failed: ${err.message}`);
     }
@@ -713,70 +787,21 @@ function Items({ token, business, printerCharacteristic, printerDevice }) {
 
   const handlePrintAllBarcodes = async () => {
     if (!printerCharacteristic) {
-      alert("Please connect the Bluetooth Thermal Printer first using the button in the header.");
+      alert('Please connect the Bluetooth Thermal Printer first.');
       return;
     }
-
-    const itemsToPrint = filteredItems;
+    const itemsToPrint = filteredItems.filter(i => (i.barcode || '').trim());
     if (itemsToPrint.length === 0) {
-      alert("No items available to print.");
+      alert('No items with barcodes available to print.');
       return;
     }
-
-    if (!window.confirm(`Are you sure you want to print barcodes for all ${itemsToPrint.length} listed item(s)?`)) {
-      return;
-    }
-
+    if (!window.confirm(`Print barcodes for ${itemsToPrint.length} item(s)?`)) return;
     try {
-      const encoder = new TextEncoder();
-      
-      for (let i = 0; i < itemsToPrint.length; i++) {
-        const item = itemsToPrint[i];
-        const barcodeData = item.barcode;
-        if (!barcodeData) continue;
-
-        const commands = [];
-
-        // Initialize printer (ESC @)
-        commands.push(0x1B, 0x40);
-
-        // Center align (ESC a 1)
-        commands.push(0x1B, 0x61, 0x01);
-
-        // Print product name
-        const nameBytes = encoder.encode(`${item.name}\n`);
-        commands.push(...nameBytes);
-
-        // Set barcode height to 80 dots (GS h 80)
-        commands.push(0x1D, 0x68, 0x50);
-
-        // Set barcode width (GS w 2)
-        commands.push(0x1D, 0x77, 0x02);
-
-        // Set HRI characters position below barcode (GS H 2)
-        commands.push(0x1D, 0x48, 0x02);
-
-        // Print barcode (Code 128 System B)
-        const barcodeBytes = encoder.encode(barcodeData);
-        const length = barcodeBytes.length + 2; // +2 for subset selectors
-        commands.push(0x1D, 0x6B, 0x49, length, 0x7B, 0x42, ...barcodeBytes);
-
-        // Feed paper 3 lines (ESC d 3)
-        commands.push(0x1B, 0x64, 0x03);
-
-        const data = new Uint8Array(commands);
-        
-        // Chunk write in 20-byte payloads
-        const chunkSize = 20;
-        for (let offset = 0; offset < data.length; offset += chunkSize) {
-          const chunk = data.slice(offset, offset + chunkSize);
-          await printerCharacteristic.writeValue(chunk);
-        }
-
-        // Delay between print jobs to allow the printer's motor/buffer to keep up
-        await new Promise(resolve => setTimeout(resolve, 800));
+      for (const item of itemsToPrint) {
+        await printBarcodeLabel(printerCharacteristic, item);
+        await new Promise(r => setTimeout(r, 600));
       }
-      alert("All print jobs successfully sent to the printer!");
+      alert('All barcodes sent to printer successfully!');
     } catch (err) {
       alert(`Printing failed: ${err.message}`);
     }

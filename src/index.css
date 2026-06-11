@@ -2144,30 +2144,19 @@ label {
   }
 }
 
-/* Home Header Navigation Shell */
+/* Home Header Navigation Shell – Tablet (768–991px): single clean row, hide search bar */
 @media (max-width: 991px) {
   .home-topbar {
-    height: auto !important;
-    min-height: 70px !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    padding: 12px 16px !important;
-    gap: 12px !important;
-  }
-
-  .topbar-brand {
-    justify-content: space-between !important;
-    width: 100% !important;
+    padding: 12px 20px !important;
   }
 
   .topbar-search {
-    width: 100% !important;
-    max-width: 100% !important;
+    display: none !important;
+    /* Hide search bar on tablets to keep the header clean & single-row.
+       The search input on POS tab can be used for lookups instead. */
   }
 
   .topbar-actions {
-    width: 100% !important;
-    justify-content: space-between !important;
     gap: 12px !important;
   }
 }
@@ -2193,9 +2182,9 @@ label {
       "search search" !important;
     grid-template-columns: 1fr auto !important;
     grid-template-rows: auto auto !important;
-    gap: 10px 12px !important;
+    gap: 8px 12px !important;
     height: auto !important;
-    padding: 12px 16px !important;
+    padding: 10px 14px !important;
   }
 
   .topbar-brand {
@@ -2211,7 +2200,9 @@ label {
     gap: 10px !important;
   }
 
+  /* Restore search bar on mobile (overrides the 991px hide) */
   .topbar-search {
+    display: block !important;
     grid-area: search !important;
     width: 100% !important;
     margin: 0 !important;
@@ -2219,32 +2210,27 @@ label {
 
   .topbar-subtitle {
     display: none !important;
-    /* Hide subtitle on mobile/tablet to save space */
   }
 
   .topbar-title {
-    font-size: 1.1rem !important;
-    /* Slightly smaller text for brand title */
+    font-size: 1.05rem !important;
   }
 
   .topbar-store-btn {
-    padding: 6px 10px !important;
-    /* Reduce button padding */
+    padding: 6px 8px !important;
   }
 
   .topbar-store-name {
-    max-width: 90px !important;
-    /* Limit business name width on mobile */
+    max-width: 80px !important;
   }
 
   .topbar-username {
     display: none !important;
-    /* Hide username text, only show user avatar circle */
   }
 
   .topbar-logo-icon {
-    width: 36px !important;
-    height: 36px !important;
+    width: 34px !important;
+    height: 34px !important;
   }
 
   .topbar-logo-icon svg {

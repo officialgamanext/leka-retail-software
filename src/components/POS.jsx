@@ -122,6 +122,11 @@ function POS({ token, business, printerCharacteristic }) {
   const [scanInput, setScanInput] = useState('');
   const [showCameraSimulation, setShowCameraSimulation] = useState(false);
   const scanInputRef = useRef(null);
+  const scanInputValueRef = useRef(''); // Always-fresh copy of scanInput (avoids stale state in handlers)
+
+  // Keep a ref of products so camera scanner callbacks always see latest data
+  const productsRef = useRef([]);
+  useEffect(() => { productsRef.current = products; }, [products]);
 
   // Tab 2: Item Billing Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -432,6 +437,43 @@ function POS({ token, business, printerCharacteristic }) {
   const [customerDirectory, setCustomerDirectory] = useState([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
+  // Helper: barcode lookup — case-insensitive, strips all whitespace & control chars
+  const findProductByBarcode = useCallback((rawCode) => {
+    const code = rawCode.replace(/[\r\n\t\s]/g, '').toLowerCase();
+    if (!code) return null;
+    return productsRef.current.find(p => {
+      const stored = (p.barcode || '').replace(/[\r\n\t\s]/g, '').toLowerCase();
+      return stored !== '' && stored === code;
+    }) || null;
+  }, []);
+
+  // Ref to always-current handleAddToCart (set during render below)
+  const handleAddToCartRef = useRef(null);
+  // Ref to always-current processBarcode (set during render below)
+  const processBarcodeRef = useRef(null);
+
+  // Global focus-redirect listener: when USB scanner types chars anywhere on the page,
+  // redirect focus to the barcode input field so React's onChange can capture them.
+  // This is simpler and more reliable than intercepting keystrokes globally.
+  useEffect(() => {
+    if (activeTab !== 'barcode' || cameraActive) return;
+
+    const onKeyDown = (e) => {
+      // Skip if already in the barcode input or in another input/textarea/select
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      // For any printable character, focus the barcode input
+      // USB scanner will continue typing into it
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        scanInputRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [activeTab, cameraActive]);
+
   // Camera scanner logic (inline scanner)
   useEffect(() => {
     let html5QrCode;
@@ -471,24 +513,17 @@ function POS({ token, business, printerCharacteristic }) {
           config,
           (decodedText) => {
             const now = Date.now();
-            // Debounce matching barcode scans for 1.5 seconds
+            // Debounce duplicate scans for 1500ms
             if (decodedText === lastScannedText && now - lastScannedTime < 1500) {
               return;
             }
             lastScannedText = decodedText;
             lastScannedTime = now;
 
-            const matched = products.find(p => p.barcode === decodedText.trim());
-            if (matched) {
-              handleAddToCart(matched);
-              setScanFeedback(`Added: ${matched.name} x1`);
-              setTimeout(() => setScanFeedback(''), 3000);
-            } else {
-              setScanFeedback(`⚠️ Barcode "${decodedText}" not found`);
-              setTimeout(() => setScanFeedback(''), 3000);
-            }
+            // Use processBarcodeRef to always have the latest processBarcode function
+            processBarcodeRef.current && processBarcodeRef.current(decodedText);
           },
-          (errorMessage) => { }
+          (_errorMessage) => { /* suppress per-frame decode errors */ }
         ).catch(err => {
           console.error("Error starting camera scanner: ", err);
           alert("Could not access camera. Please ensure camera permissions are granted.");
@@ -513,7 +548,7 @@ function POS({ token, business, printerCharacteristic }) {
         }
       };
     }
-  }, [cameraActive, products]);
+  }, [cameraActive, findProductByBarcode]);
 
   // Derived list of unique customers from customerDirectory + history + localCustomers
   const getUniqueCustomers = () => {
@@ -599,6 +634,8 @@ function POS({ token, business, printerCharacteristic }) {
       }]);
     }
   };
+  // Keep the ref always pointing to the latest version (avoids stale closures in scanner listeners)
+  handleAddToCartRef.current = handleAddToCart;
 
   const handleUpdateQty = (productId, newQty) => {
     if (newQty <= 0) {
@@ -648,22 +685,43 @@ function POS({ token, business, printerCharacteristic }) {
   const gstAmount = calculateGst();
   const grandTotal = Math.max(0, subtotal + gstAmount - Number(discount || 0));
 
-  // Barcode Scanning Input handler
+  // Barcode lookup and add to cart helper — used by both manual input and camera scanner
+  const processBarcode = useCallback((rawCode) => {
+    const trimmed = rawCode.replace(/[\r\n\t]/g, '').trim();
+    if (!trimmed) return;
+
+    const matched = findProductByBarcode(trimmed);
+    if (matched) {
+      // Use ref to avoid stale cart state
+      handleAddToCartRef.current && handleAddToCartRef.current(matched);
+      setScanFeedback('OK:' + matched.name);
+      setTimeout(() => setScanFeedback(''), 2500);
+    } else {
+      setScanFeedback('ERR:' + trimmed);
+      setTimeout(() => setScanFeedback(''), 4000);
+    }
+    setScanInput('');
+    scanInputValueRef.current = '';
+    setTimeout(() => scanInputRef.current?.focus(), 30);
+  }, [findProductByBarcode]);
+  // Keep ref fresh so camera scanner always calls the latest version
+  processBarcodeRef.current = processBarcode;
+
+  // Handle Enter key pressed in the input (USB scanners send Enter after barcode)
+  const handleScanKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Read directly from DOM to avoid stale React state
+      const rawValue = scanInputRef.current?.value || scanInputValueRef.current || '';
+      processBarcode(rawValue);
+    }
+  };
+
+  // Handle form submit (button click fallback)
   const handleBarcodeSubmit = (e) => {
     e.preventDefault();
-    if (!scanInput.trim()) return;
-
-    const matched = products.find(p => p.barcode === scanInput.trim());
-    if (matched) {
-      handleAddToCart(matched);
-      setScanInput('');
-    } else {
-      alert(`No product found matching barcode: "${scanInput}"`);
-      setScanInput('');
-    }
-
-    // Maintain input focus
-    setTimeout(() => scanInputRef.current?.focus(), 50);
+    const rawValue = scanInputRef.current?.value || scanInputValueRef.current || '';
+    processBarcode(rawValue);
   };
 
   const handleThermalPrintReceipt = async (invoice) => {
@@ -1125,22 +1183,25 @@ function POS({ token, business, printerCharacteristic }) {
                     {scanFeedback && (
                       <div style={{
                         width: '100%', maxWidth: '440px',
-                        padding: '8px 12px', borderRadius: '8px',
-                        background: scanFeedback.startsWith('⚠️') ? '#fef2f2' : '#f0fdf4',
-                        color: scanFeedback.startsWith('⚠️') ? '#ef4444' : '#15803d',
-                        fontSize: '0.8rem', fontWeight: 600, textAlign: 'center', marginTop: '12px',
-                        border: scanFeedback.startsWith('⚠️') ? '1px solid #fee2e2' : '1px solid #dcfce7',
+                        padding: '10px 14px', borderRadius: '8px',
+                        background: scanFeedback.startsWith('ERR:') ? '#fef2f2' : '#f0fdf4',
+                        color: scanFeedback.startsWith('ERR:') ? '#ef4444' : '#16a34a',
+                        fontSize: '0.82rem', fontWeight: 600, textAlign: 'center', marginTop: '12px',
+                        border: scanFeedback.startsWith('ERR:') ? '1px solid #fee2e2' : '1px solid #bbf7d0',
                         animation: 'fadeIn 0.2s ease'
                       }}>
-                        {scanFeedback}
+                        {scanFeedback.startsWith('ERR:')
+                          ? `Not found: "${scanFeedback.slice(4)}" — check product barcode`
+                          : `Added to cart: ${scanFeedback.slice(3)}`
+                        }
                       </div>
                     )}
                   </div>
                 ) : (
-                  /* Manual input fallback fields when camera is stopped */
+                  /* Manual input / USB hardware scanner mode */
                   <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
                     <label htmlFor="scan-field" style={{ fontSize: '0.78rem', fontWeight: 500, color: '#4b5563', display: 'block', marginBottom: '6px' }}>
-                      Or manually enter barcode number
+                      USB / Bluetooth scanner ready — or type barcode and press Enter
                     </label>
                     <form onSubmit={handleBarcodeSubmit} style={{ display: 'flex', gap: '10px' }}>
                       <div style={{ position: 'relative', flex: 1 }}>
@@ -1149,17 +1210,38 @@ function POS({ token, business, printerCharacteristic }) {
                           id="scan-field"
                           ref={scanInputRef}
                           type="text"
-                          placeholder="Scan or type item barcode..."
+                          placeholder="Scan barcode here (auto-focused for scanner)..."
                           value={scanInput}
-                          onChange={(e) => setScanInput(e.target.value)}
+                          onChange={(e) => {
+                            setScanInput(e.target.value);
+                            scanInputValueRef.current = e.target.value; // keep ref fresh
+                          }}
+                          onKeyDown={handleScanKeyDown}
                           autoFocus
+                          autoComplete="off"
                           style={{ paddingLeft: '38px', background: '#f9fafb', color: '#0f172a' }}
                         />
                       </div>
                       <button type="submit" className="btn-blue-primary" style={{ width: 'auto', padding: '10px 20px', fontSize: '0.85rem' }}>
-                        Add Item
+                        Add
                       </button>
                     </form>
+                    {scanFeedback && (
+                      <div style={{
+                        marginTop: '10px',
+                        padding: '10px 14px', borderRadius: '8px',
+                        background: scanFeedback.startsWith('ERR:') ? '#fef2f2' : '#f0fdf4',
+                        color: scanFeedback.startsWith('ERR:') ? '#ef4444' : '#16a34a',
+                        fontSize: '0.82rem', fontWeight: 600,
+                        border: scanFeedback.startsWith('ERR:') ? '1px solid #fee2e2' : '1px solid #bbf7d0',
+                        animation: 'fadeIn 0.2s ease'
+                      }}>
+                        {scanFeedback.startsWith('ERR:')
+                          ? `Not found: "${scanFeedback.slice(4)}" — check product barcode setup`
+                          : `Added to cart: ${scanFeedback.slice(3)}`
+                        }
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
