@@ -327,6 +327,9 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
                 token={token}
                 business={business}
                 printerCharacteristic={printerCharacteristic}
+                handleConnectPrinter={handleConnectPrinter}
+                printerConnecting={printerConnecting}
+                printerDevice={printerDevice}
               />
             </div>
           );
@@ -336,6 +339,9 @@ function Dashboard({ token, business, user, onSwitchBusiness, onLogout }) {
             token={token}
             business={business}
             printerCharacteristic={printerCharacteristic}
+            handleConnectPrinter={handleConnectPrinter}
+            printerConnecting={printerConnecting}
+            printerDevice={printerDevice}
           />
         );
       case 'products':

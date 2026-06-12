@@ -4,7 +4,7 @@ import {
   Search, ShoppingBag, Trash2, Tag, CreditCard, Banknote,
   Landmark, Loader2, Sparkles, ReceiptText, Barcode, Eye,
   Plus, Minus, CheckCircle, Printer, AlertTriangle, Play, X, Wallet, RefreshCw,
-  UserPlus, Camera, MapPin, ChevronDown, Package
+  UserPlus, Camera, MapPin, ChevronDown, Package, Calendar
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
@@ -102,9 +102,29 @@ function CategoryDropdown({ categories, value, onChange }) {
   );
 }
 
-function POS({ token, business, printerCharacteristic }) {
+const getProductUnit = (p) => {
+  if (p.unit) return p.unit;
+  const name = (p.name || '').toLowerCase();
+  if (name.includes('chicken') || name.includes('pakoda') || name.includes('cafe item') || name.includes('kg') || name.includes('mutton') || name.includes('fish') || name.includes('weight') || name.includes('raw')) {
+    return 'kg';
+  }
+  return 'pcs';
+};
+
+function POS({ token, business, printerCharacteristic, handleConnectPrinter, printerConnecting, printerDevice }) {
   // Navigation Tabs: 'barcode' | 'item' | 'history'
   const [activeTab, setActiveTab] = useState('barcode');
+
+  // Mobile layout detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Mobile bottom sheet state
+  const [showMobileCheckoutSheet, setShowMobileCheckoutSheet] = useState(false);
 
   // Master Data
   const [products, setProducts] = useState([]);
@@ -136,6 +156,9 @@ function POS({ token, business, printerCharacteristic }) {
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
+  const [historyDateFilterType, setHistoryDateFilterType] = useState('today'); // 'all' | 'today' | 'yesterday' | '7days' | '30days' | 'custom'
+  const [historyStartDate, setHistoryStartDate] = useState('');
+  const [historyEndDate, setHistoryEndDate] = useState('');
 
   // Modals / Overlays
   const [checkoutInvoice, setCheckoutInvoice] = useState(null);
@@ -667,6 +690,7 @@ function POS({ token, business, printerCharacteristic }) {
     setCustomerAddress('');
     setCustomerSearchQuery('');
     setDiscount(0);
+    setShowMobileCheckoutSheet(false);
   };
 
   // Calculations
@@ -1007,11 +1031,82 @@ function POS({ token, business, printerCharacteristic }) {
   });
 
   // Filtered lists for Tab 3: History Search
-  const filteredHistory = history.filter(inv =>
-    inv.invoiceNumber.toLowerCase().includes(historySearch.toLowerCase()) ||
-    inv.customerName.toLowerCase().includes(historySearch.toLowerCase()) ||
-    (inv.customerPhone && inv.customerPhone.includes(historySearch))
-  );
+  const filteredHistory = history.filter(inv => {
+    // 1. Text Search Filter
+    const matchesSearch =
+      inv.invoiceNumber.toLowerCase().includes(historySearch.toLowerCase()) ||
+      inv.customerName.toLowerCase().includes(historySearch.toLowerCase()) ||
+      (inv.customerPhone && inv.customerPhone.includes(historySearch));
+
+    if (!matchesSearch) return false;
+
+    // 2. Date Filter
+    if (historyDateFilterType === 'all') return true;
+
+    const dateVal = inv.createdAt?._seconds
+      ? new Date(inv.createdAt._seconds * 1000)
+      : new Date(inv.createdAt);
+
+    const invoiceTime = dateVal.getTime();
+    const now = new Date();
+
+    // Helper to get start of day in local time
+    const getStartOfDay = (d) => {
+      const copy = new Date(d);
+      copy.setHours(0, 0, 0, 0);
+      return copy.getTime();
+    };
+
+    // Helper to get end of day in local time
+    const getEndOfDay = (d) => {
+      const copy = new Date(d);
+      copy.setHours(23, 59, 59, 999);
+      return copy.getTime();
+    };
+
+    const startOfToday = getStartOfDay(now);
+    const endOfToday = getEndOfDay(now);
+
+    if (historyDateFilterType === 'today') {
+      return invoiceTime >= startOfToday && invoiceTime <= endOfToday;
+    }
+
+    if (historyDateFilterType === 'yesterday') {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const startOfYesterday = getStartOfDay(yesterday);
+      const endOfYesterday = getEndOfDay(yesterday);
+      return invoiceTime >= startOfYesterday && invoiceTime <= endOfYesterday;
+    }
+
+    if (historyDateFilterType === '7days') {
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      return invoiceTime >= getStartOfDay(sevenDaysAgo) && invoiceTime <= endOfToday;
+    }
+
+    if (historyDateFilterType === '30days') {
+      const thirtyDaysAgo = new Date(now);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      return invoiceTime >= getStartOfDay(thirtyDaysAgo) && invoiceTime <= endOfToday;
+    }
+
+    if (historyDateFilterType === 'custom') {
+      if (historyStartDate) {
+        const parts = historyStartDate.split('-');
+        const startDateLocal = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+        if (invoiceTime < startDateLocal.getTime()) return false;
+      }
+      if (historyEndDate) {
+        const parts = historyEndDate.split('-');
+        const endDateLocal = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
+        if (invoiceTime > endDateLocal.getTime()) return false;
+      }
+      return true;
+    }
+
+    return true;
+  });
 
   return (
     <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', gap: '20px', minHeight: 'calc(100vh - 70px)', background: '#f8fafc' }}>
@@ -1115,7 +1210,7 @@ function POS({ token, business, printerCharacteristic }) {
       </div>
 
       {/* Main Layout Area */}
-      <div className="pos-terminal-layout" style={{ display: 'flex', gap: '24px', flexGrow: 1, alignItems: 'stretch' }}>
+      <div className="pos-terminal-layout" style={{ display: 'flex', gap: isMobile ? '0' : '24px', flexGrow: 1, alignItems: 'stretch', flexDirection: isMobile ? 'column' : 'row' }}>
 
         {/* Left Interactive Side */}
         <div className="pos-main-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1316,135 +1411,379 @@ function POS({ token, business, printerCharacteristic }) {
 
           {/* TAB 2: ITEM BILLING */}
           {activeTab === 'item' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flexGrow: 1 }}>
-
-              {/* Filter controls row */}
-              <div style={{ display: 'flex', gap: '12px', background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #cbd5e1', alignItems: 'center' }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <Search size={14} style={{ position: 'absolute', left: '12px', top: '12px', color: '#4b5563' }} />
+            isMobile ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flexGrow: 1, padding: '0 4px 80px 4px' }}>
+                
+                {/* Mobile Search Bar */}
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <Search size={16} style={{ position: 'absolute', left: '14px', top: '12px', color: '#9ca3af' }} />
                   <input
                     type="text"
-                    placeholder="Search item by name or short code..."
+                    placeholder="Search items..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ display: 'block', width: '100%', boxSizing: 'border-box', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 12px 10px 36px', fontSize: '0.85rem' }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      background: '#ffffff',
+                      color: '#1f2937',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '24px',
+                      padding: '10px 16px 10px 42px',
+                      fontSize: '0.9rem',
+                      height: '42px',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                      outline: 'none'
+                    }}
                   />
                 </div>
 
-                <CategoryDropdown
-                  categories={categories}
-                  value={selectedCategory}
-                  onChange={(id) => setSelectedCategory(id)}
-                />
-              </div>
+                {/* Mobile Category Slider (Horizontal Scroll) */}
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '8px', 
+                  overflowX: 'auto', 
+                  padding: '4px 0 8px 0', 
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none'
+                }} className="no-scrollbar">
+                  <style>{`
+                    .no-scrollbar::-webkit-scrollbar {
+                      display: none;
+                    }
+                  `}</style>
+                  {[{ id: '', name: 'All Items' }, ...categories].map(cat => {
+                    const isSelected = selectedCategory === cat.id;
+                    const isAllItems = cat.id === '';
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat.id)}
+                        style={{
+                          flexShrink: 0,
+                          padding: '8px 18px',
+                          borderRadius: '20px',
+                          border: isSelected ? 'none' : '1px solid #e2e8f0',
+                          background: isSelected ? '#2563eb' : '#ffffff', // primary blue
+                          color: isSelected ? '#ffffff' : '#374151',
+                          fontWeight: 600,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {isAllItems ? 'All Items' : cat.name}
+                      </button>
+                    );
+                  })}
+                </div>
 
-              {/* Items Card Grid */}
-              <div style={{ flexGrow: 1, minHeight: '300px', maxHeight: '420px', overflowY: 'auto' }}>
-                {loading ? (
-                  <div style={{ display: 'flex', justifyContent: 'center', padding: '60px' }}>
-                    <Loader2 className="animate-spin" size={28} style={{ color: '#2563eb' }} />
-                  </div>
-                ) : filteredProducts.length === 0 ? (
-                  <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', textAlign: 'center', padding: '48px', color: '#6b7280' }}>
-                    <Package size={36} style={{ color: '#cbd5e1', marginBottom: '12px' }} />
-                    <p style={{ fontWeight: 500 }}>No products found matching criteria</p>
-                  </div>
-                ) : (
-                  <div className="pos-products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
-                    {filteredProducts.map(p => {
-                      const cartItem = cart.find(item => item.productId === p.id);
-                      const isAdded = !!cartItem;
-                      const isOutOfStock = p.stock <= 0;
+                {/* Mobile 3-column Items Grid */}
+                <div style={{ flexGrow: 1, overflowY: 'auto', maxHeight: 'calc(100vh - 260px)' }} className="no-scrollbar">
+                  {loading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+                      <Loader2 className="animate-spin" size={24} style={{ color: '#2563eb' }} />
+                    </div>
+                  ) : filteredProducts.length === 0 ? (
+                    <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', textAlign: 'center', padding: '36px', color: '#6b7280' }}>
+                      <Package size={30} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
+                      <p style={{ fontWeight: 500, fontSize: '0.85rem' }}>No products found</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                      {filteredProducts.map(p => {
+                        const cartItem = cart.find(item => item.productId === p.id);
+                        const isAdded = !!cartItem;
+                        const isOutOfStock = p.stock <= 0;
+                        const unit = getProductUnit(p);
 
-                      return (
-                        <div
-                          key={p.id}
-                          onClick={() => !isOutOfStock && handleAddToCart(p)}
-                          className="pos-product-card"
-                          style={{
-                            background: '#ffffff', border: isAdded ? '2px solid #2563eb' : '1px solid #e5e7eb',
-                            borderRadius: '12px', display: 'flex', flexDirection: 'column',
-                            transition: 'all 0.2s ease', position: 'relative', opacity: isOutOfStock ? 0.6 : 1,
-                            cursor: isOutOfStock ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          {/* Image Placeholder */}
-                          <div className="pos-prod-img-wrapper" style={{ width: '100%', height: '80px', borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                            {p.imageUrl ? (
-                              <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <Package size={24} style={{ color: '#cbd5e1' }} />
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => !isOutOfStock && !isAdded && handleAddToCart(p)}
+                            style={{
+                              background: '#ffffff',
+                              border: isAdded ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                              borderRadius: '16px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              padding: '6px',
+                              position: 'relative',
+                              opacity: isOutOfStock ? 0.5 : 1,
+                              cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                              transition: 'all 0.2s ease',
+                              boxSizing: 'border-box'
+                            }}
+                          >
+                            {/* Selected count badge at top-right */}
+                            {isAdded && (
+                              <div style={{
+                                position: 'absolute',
+                                top: '6px',
+                                right: '6px',
+                                background: '#2563eb',
+                                color: '#ffffff',
+                                borderRadius: '50%',
+                                width: '20px',
+                                height: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold',
+                                zIndex: 5
+                              }}>
+                                {cartItem.quantity}
+                              </div>
                             )}
-                          </div>
 
-                          <div>
-                            <div className="pos-prod-name" style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1f2937', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '2.4em', lineHeight: '1.2' }}>
+                            {/* Product Image */}
+                            <div style={{ 
+                              width: '100%', 
+                              height: '70px', 
+                              borderRadius: '12px', 
+                              background: '#f8fafc', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              overflow: 'hidden',
+                              marginBottom: '6px'
+                            }}>
+                              {p.imageUrl ? (
+                                <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <Package size={20} style={{ color: '#cbd5e1' }} />
+                              )}
+                            </div>
+
+                            {/* Product Title */}
+                            <div style={{ 
+                              fontSize: '0.75rem', 
+                              fontWeight: 600, 
+                              color: '#475569', 
+                              textAlign: 'left',
+                              padding: '0 4px',
+                              lineHeight: '1.2',
+                              minHeight: '2.4em',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical'
+                            }}>
                               {p.name}
                             </div>
-                            <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>{p.categoryName || 'General'}</span>
-                          </div>
 
-                          <div className="pos-prod-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>₹{Number(p.price).toFixed(2)}</span>
-                            <span style={{ fontSize: '0.7rem', color: p.stock <= 5 ? '#ef4444' : '#6b7280', fontWeight: 500 }}>
-                              {isOutOfStock ? 'No Stock' : `Qty: ${p.stock}`}
-                            </span>
-                          </div>
+                            {/* Product Price & Unit */}
+                            <div style={{ 
+                              fontSize: '0.75rem', 
+                              fontWeight: 600, 
+                              color: '#2563eb', 
+                              textAlign: 'left',
+                              padding: '2px 4px 6px 4px'
+                            }}>
+                              ₹{Number(p.price).toFixed(0)}<span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 500 }}>/{unit}</span>
+                            </div>
 
-                          {/* Add/Plus/Minus buttons overlay */}
-                          <div style={{ marginTop: '4px' }}>
-                            {isOutOfStock ? (
-                              <button className="pos-prod-add-btn oos" disabled style={{ width: '100%', background: '#cbd5e1', border: 'none', color: '#ffffff', padding: '6px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'not-allowed', fontWeight: 600 }}>
-                                <span>Out of Stock</span>
-                              </button>
-                            ) : isAdded ? (
-                              <div className="pos-prod-qty-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '4px' }}>
-                                <button type="button" onClick={(e) => { e.stopPropagation(); handleUpdateQty(p.id, cartItem.quantity - 1); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px', display: 'flex' }}>
-                                  <Minus size={12} />
+                            {/* Quantity Controls Overlay if added */}
+                            {isAdded && (
+                              <div style={{ 
+                                marginTop: 'auto',
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between',
+                                border: '1px solid #2563eb',
+                                borderRadius: '8px',
+                                padding: '2px',
+                                background: '#ffffff'
+                              }}>
+                                <button 
+                                  type="button" 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    handleUpdateQty(p.id, cartItem.quantity - 1); 
+                                  }} 
+                                  style={{ 
+                                    background: 'none', 
+                                    border: 'none', 
+                                    color: '#2563eb', 
+                                    cursor: 'pointer', 
+                                    padding: '4px', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    flex: 1
+                                  }}
+                                >
+                                  <Minus size={12} strokeWidth={2.5} />
                                 </button>
-                                <span className="pos-prod-qty-badge" style={{ fontSize: '0.75rem', fontWeight: 600, color: '#2563eb' }}>{cartItem.quantity}</span>
-                                <button type="button" onClick={(e) => { e.stopPropagation(); handleUpdateQty(p.id, cartItem.quantity + 1); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px', display: 'flex' }}>
-                                  <Plus size={12} />
+                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#2563eb', padding: '0 4px' }}>
+                                  {cartItem.quantity}
+                                </span>
+                                <button 
+                                  type="button" 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    handleUpdateQty(p.id, cartItem.quantity + 1); 
+                                  }} 
+                                  style={{ 
+                                    background: 'none', 
+                                    border: 'none', 
+                                    color: '#2563eb', 
+                                    cursor: 'pointer', 
+                                    padding: '4px', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    flex: 1
+                                  }}
+                                >
+                                  <Plus size={12} strokeWidth={2.5} />
                                 </button>
                               </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleAddToCart(p); }}
-                                className="pos-prod-add-btn"
-                                style={{ width: '100%', background: '#2563eb', border: 'none', color: '#ffffff', padding: '6px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                              >
-                                <Plus size={11} /> <span>Select Item</span>
-                              </button>
                             )}
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
-              {/* Selected List details */}
-              <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '16px 24px' }}>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f172a', marginBottom: '10px' }}>
-                  Billing items checklist:
-                </h3>
-                {cart.length === 0 ? (
-                  <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Select products above to build invoice.</span>
-                ) : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {cart.map(item => (
-                      <span key={item.productId} style={{ fontSize: '0.75rem', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', padding: '4px 10px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        <strong>{item.quantity}x</strong> {item.name}
-                        <button onClick={() => handleRemoveFromCart(item.productId)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.9rem', padding: 0 }}>×</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flexGrow: 1 }}>
 
-            </div>
+                {/* Filter controls row */}
+                <div style={{ display: 'flex', gap: '12px', background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #cbd5e1', alignItems: 'center' }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <Search size={14} style={{ position: 'absolute', left: '12px', top: '12px', color: '#4b5563' }} />
+                    <input
+                      type="text"
+                      placeholder="Search item by name or short code..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      style={{ display: 'block', width: '100%', boxSizing: 'border-box', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 12px 10px 36px', fontSize: '0.85rem' }}
+                    />
+                  </div>
+
+                  <CategoryDropdown
+                    categories={categories}
+                    value={selectedCategory}
+                    onChange={(id) => setSelectedCategory(id)}
+                  />
+                </div>
+
+                {/* Items Card Grid */}
+                <div style={{ flexGrow: 1, minHeight: '300px', maxHeight: '420px', overflowY: 'auto' }}>
+                  {loading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '60px' }}>
+                      <Loader2 className="animate-spin" size={28} style={{ color: '#2563eb' }} />
+                    </div>
+                  ) : filteredProducts.length === 0 ? (
+                    <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', textAlign: 'center', padding: '48px', color: '#6b7280' }}>
+                      <Package size={36} style={{ color: '#cbd5e1', marginBottom: '12px' }} />
+                      <p style={{ fontWeight: 500 }}>No products found matching criteria</p>
+                    </div>
+                  ) : (
+                    <div className="pos-products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
+                      {filteredProducts.map(p => {
+                        const cartItem = cart.find(item => item.productId === p.id);
+                        const isAdded = !!cartItem;
+                        const isOutOfStock = p.stock <= 0;
+
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => !isOutOfStock && handleAddToCart(p)}
+                            className="pos-product-card"
+                            style={{
+                              background: '#ffffff', border: isAdded ? '2px solid #2563eb' : '1px solid #e5e7eb',
+                              borderRadius: '12px', display: 'flex', flexDirection: 'column',
+                              transition: 'all 0.2s ease', position: 'relative', opacity: isOutOfStock ? 0.6 : 1,
+                              cursor: isOutOfStock ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {/* Image Placeholder */}
+                            <div className="pos-prod-img-wrapper" style={{ width: '100%', height: '80px', borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                              {p.imageUrl ? (
+                                <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <Package size={24} style={{ color: '#cbd5e1' }} />
+                              )}
+                            </div>
+
+                            <div>
+                              <div className="pos-prod-name" style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1f2937', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', height: '2.4em', lineHeight: '1.2' }}>
+                                {p.name}
+                              </div>
+                              <span style={{ fontSize: '0.68rem', color: '#9ca3af' }}>{p.categoryName || 'General'}</span>
+                            </div>
+
+                            <div className="pos-prod-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                              <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>₹{Number(p.price).toFixed(2)}</span>
+                              <span style={{ fontSize: '0.7rem', color: p.stock <= 5 ? '#ef4444' : '#6b7280', fontWeight: 500 }}>
+                                {isOutOfStock ? 'No Stock' : `Qty: ${p.stock}`}
+                              </span>
+                            </div>
+
+                            {/* Add/Plus/Minus buttons overlay */}
+                            <div style={{ marginTop: '4px' }}>
+                              {isOutOfStock ? (
+                                <button className="pos-prod-add-btn oos" disabled style={{ width: '100%', background: '#cbd5e1', border: 'none', color: '#ffffff', padding: '6px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'not-allowed', fontWeight: 600 }}>
+                                  <span>Out of Stock</span>
+                                </button>
+                              ) : isAdded ? (
+                                <div className="pos-prod-qty-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '4px' }}>
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); handleUpdateQty(p.id, cartItem.quantity - 1); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                                    <Minus size={12} />
+                                  </button>
+                                  <span className="pos-prod-qty-badge" style={{ fontSize: '0.75rem', fontWeight: 600, color: '#2563eb' }}>{cartItem.quantity}</span>
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); handleUpdateQty(p.id, cartItem.quantity + 1); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                                    <Plus size={12} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleAddToCart(p); }}
+                                  className="pos-prod-add-btn"
+                                  style={{ width: '100%', background: '#2563eb', border: 'none', color: '#ffffff', padding: '6px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                >
+                                  <Plus size={11} /> <span>Select Item</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected List details */}
+                <div style={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '16px 24px' }}>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f172a', marginBottom: '10px' }}>
+                    Billing items checklist:
+                  </h3>
+                  {cart.length === 0 ? (
+                    <span style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Select products above to build invoice.</span>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {cart.map(item => (
+                        <span key={item.productId} style={{ fontSize: '0.75rem', background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', padding: '4px 10px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <strong>{item.quantity}x</strong> {item.name}
+                          <button onClick={() => handleRemoveFromCart(item.productId)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.9rem', padding: 0 }}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )
           )}
 
           {/* TAB 3: BILLING HISTORY */}
@@ -1452,21 +1791,103 @@ function POS({ token, business, printerCharacteristic }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flexGrow: 1 }}>
 
               {/* History Search bar */}
-              <div style={{ display: 'flex', gap: '12px', background: '#ffffff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e5e7eb', alignItems: 'center' }}>
-                <div style={{ position: 'relative', flex: 1 }}>
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '12px',
+                background: '#ffffff',
+                padding: '16px 20px',
+                borderRadius: '12px',
+                border: '1px solid #cbd5e1',
+                alignItems: 'center'
+              }}>
+                <div style={{ position: 'relative', flex: '1 1 240px' }}>
                   <Search size={14} style={{ position: 'absolute', left: '12px', top: '11px', color: '#9ca3af' }} />
                   <input
                     type="text"
                     placeholder="Search historical bills by Invoice No. or Client info..."
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    style={{ paddingLeft: '36px', background: '#f9fafb', color: '#0f172a', fontSize: '0.85rem', padding: '8px 12px 8px 36px', width: '100%' }}
+                    style={{ background: '#ffffff', color: '#0f172a', fontSize: '0.85rem', padding: '8px 12px 8px 36px', width: '100%', border: '1px solid #cbd5e1', borderRadius: '8px', outline: 'none', boxSizing: 'border-box', height: '36px' }}
                   />
                 </div>
+
+                {/* Date Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Calendar size={14} style={{ position: 'absolute', left: '10px', color: '#64748b', pointerEvents: 'none' }} />
+                    <select
+                      value={historyDateFilterType}
+                      onChange={(e) => setHistoryDateFilterType(e.target.value)}
+                      style={{
+                        paddingLeft: '30px',
+                        paddingRight: '12px',
+                        paddingTop: '8px',
+                        paddingBottom: '8px',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: 500,
+                        color: '#1e293b',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        height: '36px',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="all">All Time</option>
+                      <option value="today">Today</option>
+                      <option value="yesterday">Yesterday</option>
+                      <option value="7days">Last 7 Days</option>
+                      <option value="30days">Last 30 Days</option>
+                      <option value="custom">Custom Range</option>
+                    </select>
+                  </div>
+
+                  {historyDateFilterType === 'custom' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <input
+                        type="date"
+                        value={historyStartDate}
+                        onChange={(e) => setHistoryStartDate(e.target.value)}
+                        style={{
+                          padding: '6px 10px',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          fontSize: '0.8rem',
+                          color: '#1e293b',
+                          outline: 'none',
+                          height: '36px',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>to</span>
+                      <input
+                        type="date"
+                        value={historyEndDate}
+                        onChange={(e) => setHistoryEndDate(e.target.value)}
+                        style={{
+                          padding: '6px 10px',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          fontSize: '0.8rem',
+                          color: '#1e293b',
+                          outline: 'none',
+                          height: '36px',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <button
                   type="button"
                   onClick={fetchHistory}
-                  style={{ background: 'none', border: '1px solid #cbd5e1', color: '#4b5563', padding: '8px 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{ background: 'none', border: '1px solid #cbd5e1', color: '#4b5563', padding: '8px 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', height: '36px', boxSizing: 'border-box', marginLeft: 'auto' }}
                 >
                   <RefreshCw size={12} /> Refresh
                 </button>
@@ -1536,6 +1957,9 @@ function POS({ token, business, printerCharacteristic }) {
                                           customerPhone: inv.customerPhone
                                         });
                                         setSelectedPaymentMethod('Cash');
+                                        if (isMobile) {
+                                          setShowMobileCheckoutSheet(true);
+                                        }
                                       }}
                                       style={{ background: '#10b981', border: 'none', color: '#ffffff', borderRadius: '4px', padding: '4px 10px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
                                     >
@@ -1565,7 +1989,7 @@ function POS({ token, business, printerCharacteristic }) {
         </div>
 
         {/* Right Billing Details Side (Applicable for both Barcode & Item Billing tabs) */}
-        {activeTab !== 'history' && (
+        {activeTab !== 'history' && !isMobile && (
           <div className="pos-sidebar-panel" style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
             {/* Customer Details block */}
@@ -1933,7 +2357,7 @@ function POS({ token, business, printerCharacteristic }) {
       )}
 
       {/* MODAL 2: SETTLEMENT / PAYMENT POPUP */}
-      {settlementBill && (
+      {settlementBill && !isMobile && (
         <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <form onSubmit={handleExecuteSettlement} className="modal-content" style={{ background: '#ffffff', color: '#1f2937', maxWidth: '420px', borderRadius: '16px', padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px', marginBottom: '16px' }}>
@@ -2192,11 +2616,598 @@ function POS({ token, business, printerCharacteristic }) {
         </div>
       )}
 
+      {/* Mobile Floating Checkout Bar */}
+      {isMobile && cart.length > 0 && activeTab !== 'history' && (
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          left: '16px',
+          right: '16px',
+          background: '#2563eb', // primary blue
+          borderRadius: '24px',
+          padding: '12px 18px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: '0 8px 30px rgba(37, 99, 235, 0.3)', // blue shadow
+          zIndex: 90,
+          animation: 'slideUp 0.3s ease-out'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px',
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <ShoppingBag size={20} style={{ color: '#ffffff' }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '0.7rem', color: '#bfdbfe', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {cart.reduce((sum, item) => sum + item.quantity, 0)} Items
+              </span>
+              <span style={{ fontSize: '1.2rem', color: '#ffffff', fontWeight: 'bold' }}>
+                ₹{grandTotal.toFixed(0)}
+              </span>
+            </div>
+          </div>
+          
+          <button
+            type="button"
+            onClick={() => {
+              setSettlementBill({
+                isNew: true,
+                grandTotal: grandTotal,
+                customerName: customerName || '',
+                customerPhone: customerPhone || '',
+                discount: Number(discount)
+              });
+              setSelectedPaymentMethod('Cash');
+              setShowMobileCheckoutSheet(true);
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: '1rem',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            Checkout <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>&rsaquo;</span>
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Bottom Sheet Order Summary Modal */}
+      {isMobile && showMobileCheckoutSheet && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-end',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderTopLeftRadius: '28px',
+            borderTopRightRadius: '28px',
+            padding: '20px 16px 24px 16px',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 -10px 40px rgba(0,0,0,0.15)',
+            animation: 'slideUpSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxSizing: 'border-box'
+          }}>
+            {/* Drag Indicator */}
+            <div style={{
+              width: '40px',
+              height: '4px',
+              background: '#e2e8f0',
+              borderRadius: '2px',
+              margin: '0 auto 16px auto',
+              flexShrink: 0
+            }}></div>
+
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  background: '#eff6ff', // light blue
+                  color: '#2563eb', // primary blue
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <ReceiptText size={18} />
+                </div>
+                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#0f172a' }}>
+                  Order Summary
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMobileCheckoutSheet(false)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  color: '#475569',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Customer block inside bottom sheet */}
+            <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '14px', marginBottom: '14px', flexShrink: 0 }}>
+              {customerPhone ? (
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '10px 12px',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '32px', height: '32px', borderRadius: '50%',
+                    background: '#eff6ff', color: '#2563eb', fontWeight: 600, fontSize: '0.8rem'
+                  }}>
+                    {customerName ? customerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'C'}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, paddingRight: '20px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1f2937' }}>
+                      {customerName || 'Walk-in Customer'}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#4b5563', fontFamily: 'monospace' }}>
+                      {customerPhone}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerPhone('');
+                      setCustomerName('');
+                      setCustomerAddress('');
+                      setCustomerSearchQuery('');
+                      setSettlementBill(prev => prev ? { ...prev, customerName: '', customerPhone: '' } : null);
+                    }}
+                    style={{
+                      position: 'absolute', top: '8px', right: '8px',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#9ca3af', padding: '4px'
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  <label style={{ fontSize: '0.75rem', color: '#4b5563', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Select Customer <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: '#9ca3af' }} />
+                    <input
+                      type="text"
+                      placeholder="Type name or mobile number..."
+                      value={customerSearchQuery}
+                      onChange={(e) => {
+                        setCustomerSearchQuery(e.target.value);
+                        setShowCustomerDropdown(true);
+                      }}
+                      onFocus={() => setShowCustomerDropdown(true)}
+                      onBlur={() => {
+                        setTimeout(() => setShowCustomerDropdown(false), 200);
+                      }}
+                      style={{
+                        paddingLeft: '32px', background: '#f9fafb', color: '#0f172a',
+                        fontSize: '0.8rem', width: '100%', boxSizing: 'border-box',
+                        height: '34px', borderRadius: '8px', border: '1px solid #cbd5e1'
+                      }}
+                    />
+                  </div>
+                  {showCustomerDropdown && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0,
+                      background: '#ffffff', border: '1px solid #cbd5e1',
+                      borderRadius: '8px', boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
+                      zIndex: 150, marginTop: '4px', maxHeight: '160px', overflowY: 'auto'
+                    }}>
+                      {filteredCustomers.length > 0 ? (
+                        filteredCustomers.map((cust, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onMouseDown={() => {
+                              setCustomerPhone(cust.phone);
+                              setCustomerName(cust.name);
+                              setCustomerAddress(cust.address || '');
+                              setCustomerSearchQuery('');
+                              setShowCustomerDropdown(false);
+                              setSettlementBill(prev => prev ? { ...prev, customerName: cust.name, customerPhone: cust.phone } : null);
+                            }}
+                            style={{
+                              width: '100%', padding: '8px 10px', border: 'none',
+                              background: 'none', textAlign: 'left', cursor: 'pointer',
+                              fontSize: '0.78rem', display: 'flex', flexDirection: 'column',
+                              borderBottom: '1px solid #f1f5f9'
+                            }}
+                          >
+                            <span style={{ fontWeight: 600, color: '#1e293b' }}>{cust.name}</span>
+                            <span style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'monospace' }}>{cust.phone}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px', textAlign: 'center', fontSize: '0.75rem', color: '#64748b' }}>
+                          No customers found
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onMouseDown={handleOpenAddCustomerModal}
+                        style={{
+                          width: '100%', padding: '8px 10px', border: 'none',
+                          background: '#f0fdf4', color: '#15803d', textAlign: 'left',
+                          cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                          display: 'flex', alignItems: 'center', gap: '4px',
+                          borderTop: '1px solid #dcfce7', position: 'sticky', bottom: 0
+                        }}
+                      >
+                        <UserPlus size={12} /> + Add Customer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Cart Items List */}
+            <div style={{ 
+              overflowY: 'auto', 
+              maxHeight: '180px', 
+              marginBottom: '16px',
+              paddingRight: '4px'
+            }} className="no-scrollbar">
+              {(settlementBill?.isNew ? cart : (history.find(h => h.id === settlementBill?.id)?.items || [])).map((item) => (
+                <div key={item.productId || item.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 0',
+                  borderBottom: '1px solid #f1f5f9'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '8px',
+                      background: '#f8fafc',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1px solid #f1f5f9'
+                    }}>
+                      {products.find(p => p.id === (item.productId || item.id))?.imageUrl ? (
+                        <img 
+                          src={products.find(p => p.id === (item.productId || item.id))?.imageUrl} 
+                          alt={item.name} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        />
+                      ) : (
+                        <Package size={16} style={{ color: '#cbd5e1' }} />
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1f2937' }}>
+                        {item.name}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>
+                        ₹{Number(item.price).toFixed(0)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Controls or static Qty */}
+                  {settlementBill?.isNew ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#eff6ff',
+                      borderRadius: '8px',
+                      padding: '2px'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateQty(item.productId, item.quantity - 1)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#2563eb',
+                          width: '24px',
+                          height: '24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Minus size={10} strokeWidth={3} />
+                      </button>
+                      <span style={{
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold',
+                        color: '#2563eb',
+                        minWidth: '20px',
+                        textAlign: 'center'
+                      }}>
+                        {item.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateQty(item.productId, item.quantity + 1)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#2563eb',
+                          width: '24px',
+                          height: '24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Plus size={10} strokeWidth={3} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{
+                      fontSize: '0.8rem',
+                      fontWeight: 'bold',
+                      color: '#475569',
+                      background: '#f1f5f9',
+                      padding: '4px 10px',
+                      borderRadius: '6px'
+                    }}>
+                      Qty: {item.quantity}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Totals & Payments Box (Light blue background) */}
+            <div style={{
+              background: '#eff6ff',
+              borderRadius: '16px',
+              padding: '12px 14px',
+              border: '1px solid #bfdbfe',
+              marginBottom: '14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#6b7280' }}>
+                <span>Subtotal</span>
+                <span style={{ fontWeight: 600, color: '#1f2937' }}>₹{subtotal.toFixed(0)}</span>
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>Discount (₹)</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={discount}
+                  onChange={(e) => {
+                    const val = Math.max(0, Number(e.target.value));
+                    setDiscount(val);
+                    setSettlementBill(prev => prev ? { ...prev, discount: val, grandTotal: Math.max(0, subtotal + gstAmount - val) } : null);
+                  }}
+                  style={{
+                    width: '80px',
+                    textAlign: 'center',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '4px',
+                    fontSize: '0.8rem',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Payment Methods */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', margin: '4px 0' }}>
+                {[
+                  { id: 'Cash', label: 'Cash', icon: <Banknote size={14} /> },
+                  { id: 'UPI', label: 'UPI', icon: <Sparkles size={14} /> },
+                  { id: 'Card', label: 'Card', icon: <CreditCard size={14} /> }
+                ].map(mode => {
+                  const isSelected = selectedPaymentMethod === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setSelectedPaymentMethod(mode.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '8px 0',
+                        borderRadius: '10px',
+                        border: isSelected ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                        background: isSelected ? '#eff6ff' : '#ffffff',
+                        color: isSelected ? '#2563eb' : '#475569',
+                        fontWeight: 600,
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {mode.icon} {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #bfdbfe', paddingTop: '8px' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#1f2937' }}>Grand Total</span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#2563eb' }}>₹{grandTotal.toFixed(0)}</span>
+              </div>
+            </div>
+
+            {/* Printer widget */}
+            <div style={{
+              border: '1px solid #fee2e2',
+              background: '#fef2f2',
+              borderRadius: '12px',
+              padding: '10px 12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '16px',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b91c1c' }}>
+                <Printer size={16} style={{ opacity: 0.8 }} />
+                <span style={{ fontSize: '0.78rem', fontWeight: 600 }}>
+                  {printerCharacteristic ? 'Printer connected' : 'Printer disconnected'}
+                </span>
+              </div>
+              {!printerCharacteristic && (
+                <button
+                  type="button"
+                  onClick={handleConnectPrinter}
+                  disabled={printerConnecting}
+                  style={{
+                    background: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '5px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {printerConnecting ? 'Connecting...' : 'Connect'}
+                </button>
+              )}
+            </div>
+
+            {/* Settle / Cancel */}
+            <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => setShowMobileCheckoutSheet(false)}
+                style={{
+                  flex: 1,
+                  background: '#f1f5f9',
+                  border: 'none',
+                  color: '#475569',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  fontWeight: 'bold',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  if (!customerName.trim() || !customerPhone.trim()) {
+                    alert('Customer is mandatory. Please search for an existing customer or add a new customer first.');
+                    return;
+                  }
+                  handleExecuteSettlement(e);
+                }}
+                disabled={settleLoading}
+                style={{
+                  flex: 2,
+                  background: settleLoading ? '#93c5fd' : '#2563eb',
+                  border: 'none',
+                  color: '#ffffff',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  fontWeight: 'bold',
+                  fontSize: '0.85rem',
+                  cursor: settleLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'background-color 0.2s ease, transform 0.1s ease'
+                }}
+              >
+                {settleLoading ? (
+                  <><Loader2 className="animate-spin" size={16} /> Settling...</>
+                ) : (
+                  'Settle Bill'
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* Scan line laser vertical shift animation */}
       <style>{`
         @keyframes scanLineMove {
           0%, 100% { top: 15%; }
           50% { top: 85%; }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(100px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slideUpSheet {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
 
