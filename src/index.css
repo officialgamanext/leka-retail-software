@@ -2082,6 +2082,38 @@ label {
   border: 1px solid #ffedd5;
 }
 
+/* Horizontal swipe list for filter bars */
+.horizontal-swipe-list {
+  display: flex !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  white-space: nowrap !important;
+  -webkit-overflow-scrolling: touch !important;
+  width: 100% !important;
+  padding-bottom: 4px;
+}
+
+.horizontal-swipe-list::-webkit-scrollbar {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .db-panel {
+    padding: 16px !important;
+  }
+  .db-stat-card {
+    padding: 14px 16px !important;
+    gap: 12px !important;
+  }
+  .db-stat-value {
+    font-size: 1.2rem !important;
+  }
+  .payment-legend-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+}
+
 /* ==========================================
    Mobile & Tablet Responsive Adjustments
    ========================================== */

@@ -252,7 +252,7 @@ function DashboardPage({ token, business }) {
       {/* Date Filter Toolbar */}
       <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.01)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div className="horizontal-swipe-list" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <div className="horizontal-swipe-list">
             {[
               { id: 'today', label: 'Today' },
               { id: 'yesterday', label: 'Yesterday' },
@@ -476,50 +476,99 @@ function DashboardPage({ token, business }) {
               <p style={{ fontSize: '0.78rem', color: '#9ca3af', marginTop: '4px' }}>Try switching date filters or run invoices in POS billing.</p>
             </div>
           ) : (
-            /* Scrollable wrapper to prevent page stretching */
-            <div style={{ maxHeight: '480px', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: '10px' }}>
-              <div className="data-table-container" style={{ margin: 0, border: 'none', boxShadow: 'none' }}>
-                <table className="data-table" style={{ fontSize: '0.8rem' }}>
-                  <thead>
-                    <tr style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 10 }}>
-                      <th style={{ padding: '10px 14px' }}>Bill Number</th>
-                      <th style={{ padding: '10px 14px' }}>Date / Time</th>
-                      <th style={{ padding: '10px 14px' }}>Customer</th>
-                      <th style={{ padding: '10px 14px' }}>Method</th>
-                      <th style={{ padding: '10px 14px', textAlign: 'right' }}>Total (₹)</th>
-                      <th style={{ padding: '10px 14px', textAlign: 'right' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recent25Invoices.map(inv => {
-                      const dateVal = parseInvoiceDate(inv.createdAt);
-                      return (
-                        <tr key={inv.id} className="table-row-hover">
-                          <td style={{ fontWeight: 600, color: '#2563eb', fontFamily: 'monospace' }}>{inv.invoiceNumber}</td>
-                          <td>{dateVal.toLocaleString()}</td>
-                          <td style={{ fontWeight: 600, color: '#374151' }}>{inv.customerName || 'Walk-in Customer'}</td>
-                          <td>
-                            <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', fontWeight: 600 }}>
-                              {inv.paymentMethod}
-                            </span>
-                          </td>
-                          <td style={{ fontWeight: 700, textAlign: 'right', color: '#0f172a' }}>₹{Number(inv.grandTotal).toFixed(2)}</td>
-                          <td style={{ textAlign: 'right' }}>
-                            <button
-                              className="btn btn-secondary"
-                              style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              onClick={() => setSelectedInvoice(inv)}
-                            >
-                              <Eye size={12} /> View
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            <>
+              {/* Desktop Table View */}
+              <div className="desktop-table-view" style={{ maxHeight: '480px', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: '10px' }}>
+                <div className="data-table-container" style={{ margin: 0, border: 'none', boxShadow: 'none' }}>
+                  <table className="data-table" style={{ fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 10 }}>
+                        <th style={{ padding: '10px 14px' }}>Bill Number</th>
+                        <th style={{ padding: '10px 14px' }}>Date / Time</th>
+                        <th style={{ padding: '10px 14px' }}>Customer</th>
+                        <th style={{ padding: '10px 14px' }}>Method</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right' }}>Total (₹)</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'right' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recent25Invoices.map(inv => {
+                        const dateVal = parseInvoiceDate(inv.createdAt);
+                        return (
+                          <tr key={inv.id} className="table-row-hover">
+                            <td style={{ fontWeight: 600, color: '#2563eb', fontFamily: 'monospace' }}>{inv.invoiceNumber}</td>
+                            <td>{dateVal.toLocaleString()}</td>
+                            <td style={{ fontWeight: 600, color: '#374151' }}>{inv.customerName || 'Walk-in Customer'}</td>
+                            <td>
+                              <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', fontWeight: 600 }}>
+                                {inv.paymentMethod}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: 700, textAlign: 'right', color: '#0f172a' }}>₹{Number(inv.grandTotal).toFixed(2)}</td>
+                            <td style={{ textAlign: 'right' }}>
+                              <button
+                                className="btn btn-secondary"
+                                style={{ padding: '4px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                onClick={() => setSelectedInvoice(inv)}
+                              >
+                                <Eye size={12} /> View
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+
+              {/* Mobile Card-based List View */}
+              <div className="mobile-list-view" style={{ display: 'none', flexDirection: 'column', gap: '10px', maxHeight: '480px', overflowY: 'auto' }}>
+                {recent25Invoices.map(inv => {
+                  const dateVal = parseInvoiceDate(inv.createdAt);
+                  return (
+                    <div key={inv.id} style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, color: '#2563eb', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                          {inv.invoiceNumber}
+                        </span>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>
+                          ₹{Number(inv.grandTotal).toFixed(2)}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#475569' }}>
+                        <span>{inv.customerName || 'Walk-in Customer'}</span>
+                        <span style={{ fontSize: '0.68rem', padding: '2px 6px', borderRadius: '4px', background: '#e2e8f0', color: '#475569', fontWeight: 600 }}>
+                          {inv.paymentMethod}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #e2e8f0', paddingTop: '8px', marginTop: '2px' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                          {dateVal.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          onClick={() => setSelectedInvoice(inv)}
+                        >
+                          <Eye size={12} /> View
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
 
@@ -540,14 +589,14 @@ function DashboardPage({ token, business }) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {topProducts.map((prod, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.72rem' }}>
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                      <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.72rem', flexShrink: 0 }}>
                         {idx + 1}
                       </span>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1f2937' }}>{prod.name}</span>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prod.name}</span>
                     </div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', background: '#e6fcf5', padding: '2px 8px', borderRadius: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', background: '#e6fcf5', padding: '2px 8px', borderRadius: '4px', flexShrink: 0 }}>
                       {prod.quantity} sold
                     </span>
                   </div>
@@ -576,14 +625,14 @@ function DashboardPage({ token, business }) {
                     const stockNum = Number(item.stock || 0);
                     const isZero = stockNum === 0;
                     return (
-                      <div key={item.id} className="db-warning-item" style={{ padding: '8px 12px', border: '1px solid #fee2e2', borderRadius: '10px', background: isZero ? '#fff5f5' : '#fff9f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <h4 style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1f2937', margin: 0 }}>{item.name}</h4>
-                          <span style={{ fontSize: '0.68rem', color: '#9ca3af', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                      <div key={item.id} className="db-warning-item" style={{ padding: '8px 12px', border: '1px solid #fee2e2', borderRadius: '10px', background: isZero ? '#fff5f5' : '#fff9f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <h4 style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1f2937', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</h4>
+                          <span style={{ fontSize: '0.68rem', color: '#9ca3af', textTransform: 'uppercase', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', whiteSpace: 'nowrap' }}>
                             Code: {item.shortCode || 'N/A'}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', flexShrink: 0 }}>
                           <span className={isZero ? 'db-warning-badge' : 'db-warning-badge-orange'} style={{ fontSize: '0.62rem', padding: '2px 4px' }}>
                             {isZero ? 'OUT OF STOCK' : `LOW STOCK`}
                           </span>
@@ -711,6 +760,14 @@ function DashboardPage({ token, business }) {
         @media (max-width: 768px) {
           .responsive-row {
             grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .desktop-table-view {
+            display: none !important;
+          }
+          .mobile-list-view {
+            display: flex !important;
           }
         }
       `}</style>
