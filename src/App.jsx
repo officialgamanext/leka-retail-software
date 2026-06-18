@@ -8,8 +8,8 @@ import Dashboard from './components/Dashboard';
 const API_URL = import.meta.env.VITE_API_URL;
 
 // ─── Global Axios Instance ────────────────────────────────────────────────────
-// All components must use this instead of raw axios so interceptors apply.
-export const api = axios.create({ baseURL: API_URL });
+// We export the default axios instance so that interceptors apply globally to all components.
+export const api = axios;
 
 function App() {
   const [token, setToken]                   = useState(null);
@@ -164,7 +164,7 @@ function App() {
 
       try {
         // Step 1 — Verify token is still valid with the API
-        const meRes = await api.get('/auth/me');
+        const meRes = await api.get(`${API_URL}/auth/me`);
 
         if (!meRes.data.success) {
           handleLogout('Session invalid. Please log in again.');
@@ -184,7 +184,7 @@ function App() {
             return;
           }
 
-          const bizRes = await api.get('/businesses');
+          const bizRes = await api.get(`${API_URL}/businesses`);
 
           const liveBiz = bizRes.data.businesses?.find(b => b.id === savedBiz.id);
 
