@@ -627,17 +627,19 @@ function POS({ token, business, printerCharacteristic, handleConnectPrinter, pri
 
   // Cart Helpers
   const handleAddToCart = (product) => {
-    if (product.stock <= 0) {
-      alert(`Product "${product.name}" is out of stock.`);
-      return;
-    }
+    if (!business.enableOutOfStockBilling) {
+      if (product.stock <= 0) {
+        alert(`Product "${product.name}" is out of stock.`);
+        return;
+      }
 
-    const existing = cart.find(item => item.productId === product.id);
-    const currentQty = existing ? existing.quantity : 0;
+      const existing = cart.find(item => item.productId === product.id);
+      const currentQty = existing ? existing.quantity : 0;
 
-    if (currentQty >= product.stock) {
-      alert(`Cannot add more. Only ${product.stock} units available in stock.`);
-      return;
+      if (currentQty >= product.stock) {
+        alert(`Cannot add more. Only ${product.stock} units available in stock.`);
+        return;
+      }
     }
 
     if (existing) {
@@ -667,7 +669,7 @@ function POS({ token, business, printerCharacteristic, handleConnectPrinter, pri
     }
 
     const item = cart.find(i => i.productId === productId);
-    if (newQty > item.stock) {
+    if (!business.enableOutOfStockBilling && newQty > item.stock) {
       alert(`Cannot exceed available stock of ${item.stock} units.`);
       return;
     }
@@ -985,7 +987,8 @@ function POS({ token, business, printerCharacteristic, handleConnectPrinter, pri
       const updatedProducts = products.map(p => {
         const cartItem = cart.find(it => it.productId === p.id);
         if (cartItem) {
-          return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
+          const newStock = p.stock - cartItem.quantity;
+          return { ...p, stock: business.enableOutOfStockBilling ? newStock : Math.max(0, newStock) };
         }
         return p;
       });
@@ -1502,7 +1505,7 @@ function POS({ token, business, printerCharacteristic, handleConnectPrinter, pri
                         return (
                           <div
                             key={p.id}
-                            onClick={() => !isOutOfStock && !isAdded && handleAddToCart(p)}
+                            onClick={() => (!isOutOfStock || business.enableOutOfStockBilling) && !isAdded && handleAddToCart(p)}
                             style={{
                               background: '#ffffff',
                               border: isAdded ? '2px solid #2563eb' : '1px solid #e2e8f0',
@@ -1511,8 +1514,8 @@ function POS({ token, business, printerCharacteristic, handleConnectPrinter, pri
                               flexDirection: 'column',
                               padding: '6px',
                               position: 'relative',
-                              opacity: isOutOfStock ? 0.5 : 1,
-                              cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                              opacity: isOutOfStock && !business.enableOutOfStockBilling ? 0.5 : 1,
+                              cursor: isOutOfStock && !business.enableOutOfStockBilling ? 'not-allowed' : 'pointer',
                               boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
                               transition: 'all 0.2s ease',
                               boxSizing: 'border-box'
@@ -1697,13 +1700,13 @@ function POS({ token, business, printerCharacteristic, handleConnectPrinter, pri
                         return (
                           <div
                             key={p.id}
-                            onClick={() => !isOutOfStock && handleAddToCart(p)}
+                            onClick={() => (!isOutOfStock || business.enableOutOfStockBilling) && handleAddToCart(p)}
                             className="pos-product-card"
                             style={{
                               background: '#ffffff', border: isAdded ? '2px solid #2563eb' : '1px solid #e5e7eb',
                               borderRadius: '12px', display: 'flex', flexDirection: 'column',
-                              transition: 'all 0.2s ease', position: 'relative', opacity: isOutOfStock ? 0.6 : 1,
-                              cursor: isOutOfStock ? 'not-allowed' : 'pointer'
+                              transition: 'all 0.2s ease', position: 'relative', opacity: isOutOfStock && !business.enableOutOfStockBilling ? 0.6 : 1,
+                              cursor: isOutOfStock && !business.enableOutOfStockBilling ? 'not-allowed' : 'pointer'
                             }}
                           >
                             {/* Image Placeholder */}
@@ -1731,7 +1734,7 @@ function POS({ token, business, printerCharacteristic, handleConnectPrinter, pri
 
                             {/* Add/Plus/Minus buttons overlay */}
                             <div style={{ marginTop: '4px' }}>
-                              {isOutOfStock ? (
+                              {isOutOfStock && !business.enableOutOfStockBilling ? (
                                 <button className="pos-prod-add-btn oos" disabled style={{ width: '100%', background: '#cbd5e1', border: 'none', color: '#ffffff', padding: '6px', borderRadius: '6px', fontSize: '0.72rem', cursor: 'not-allowed', fontWeight: 600 }}>
                                   <span>Out of Stock</span>
                                 </button>

@@ -12,6 +12,7 @@ function Settings({ token, business, user, onSwitchBusiness, onLogout, printerDe
   const [address, setAddress] = useState(business.address || '');
   const [gstEnabled, setGstEnabled] = useState(business.gstEnabled || false);
   const [gstPercentage, setGstPercentage] = useState(business.gstPercentage !== undefined ? business.gstPercentage : 18);
+  const [enableOutOfStockBilling, setEnableOutOfStockBilling] = useState(business.enableOutOfStockBilling || false);
   
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -39,7 +40,8 @@ function Settings({ token, business, user, onSwitchBusiness, onLogout, printerDe
         name,
         address,
         gstEnabled,
-        gstPercentage: Number(gstPercentage)
+        gstPercentage: Number(gstPercentage),
+        enableOutOfStockBilling
       }, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -55,7 +57,8 @@ function Settings({ token, business, user, onSwitchBusiness, onLogout, printerDe
           name: response.data.business.name,
           address: response.data.business.address,
           gstEnabled: response.data.business.gstEnabled,
-          gstPercentage: response.data.business.gstPercentage
+          gstPercentage: response.data.business.gstPercentage,
+          enableOutOfStockBilling: response.data.business.enableOutOfStockBilling
         };
         localStorage.setItem('leka_business', JSON.stringify(updatedBiz));
         
@@ -153,7 +156,7 @@ function Settings({ token, business, user, onSwitchBusiness, onLogout, printerDe
             <div style={{ padding: '8px', background: '#fef3c7', color: '#d97706', borderRadius: '8px', display: 'flex' }}>
               <Percent size={20} />
             </div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: '#1e293b', margin: 0 }}>Tax Settings</h3>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: '#1e293b', margin: 0 }}>Billing & Tax Settings</h3>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -217,6 +220,35 @@ function Settings({ token, business, user, onSwitchBusiness, onLogout, printerDe
                 </span>
               </div>
             )}
+
+            {/* Out of Stock Billing Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+              <div>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b', display: 'block' }}>Out of Stock Billing</span>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'block' }}>Enable billing for out of stock items.</span>
+              </div>
+              
+              <label style={{ position: 'relative', display: 'inline-block', width: '46px', height: '24px', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={enableOutOfStockBilling} 
+                  onChange={e => setEnableOutOfStockBilling(e.target.checked)}
+                  disabled={saving}
+                  style={{ opacity: 0, width: 0, height: 0 }} 
+                />
+                <span style={{
+                  position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: enableOutOfStockBilling ? '#2563eb' : '#cbd5e1',
+                  transition: '.3s', borderRadius: '24px'
+                }}>
+                  <span style={{
+                    position: 'absolute', content: '""', height: '18px', width: '18px', left: enableOutOfStockBilling ? '24px' : '4px', bottom: '3px',
+                    backgroundColor: 'white', transition: '.3s', borderRadius: '50%',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                  }}></span>
+                </span>
+              </label>
+            </div>
 
             <button
               type="submit"
